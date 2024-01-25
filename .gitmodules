@@ -1,0 +1,14 @@
+[submodule "acb-sdk"]
+	path = acb-sdk
+	url = https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK.git
+[submodule "acb-sdk/"]
+	url = git@github.com:AntChainOpenLabs/AntChainBridgePluginSDK.git
+[submodule "acb-relayer"]
+	path = acb-relayer
+	url = https://github.com/AntChainOpenLabs/AntChainBridgeRelayer.git
+[submodule "acb-pluginserver"]
+	path = acb-pluginserver
+	url = https://github.com/AntChainOpenLabs/AntChainBridgePluginServer.git
+[submodule "bif-bcdns"]
+	path = bif-bcdns
+	url = https://git.xinghuo.space/xinghuo-open-source/DLT/bcdns.git
