@@ -1,8 +1,6 @@
 [submodule "acb-sdk"]
 	path = acb-sdk
 	url = https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK.git
-[submodule "acb-sdk/"]
-	url = git@github.com:AntChainOpenLabs/AntChainBridgePluginSDK.git
 [submodule "acb-relayer"]
 	path = acb-relayer
 	url = https://github.com/AntChainOpenLabs/AntChainBridgeRelayer.git
