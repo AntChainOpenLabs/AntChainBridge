@@ -18,10 +18,6 @@ AntChain Bridg是蚂蚁链开源的区块链之间的可信通信网络，我们
 
 想要详细了解AntChain Bridge，可以阅读我们[Wiki](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/wiki)的内容。
 
-## 编译
-
-TODO：provides more scripts for this
-
 ## 版本
 
 ### 组件
@@ -30,6 +26,7 @@ TODO：provides more scripts for this
 
 | AntChainBridge |                   AntChainBridgePluginSDK                    |                    AntChainBridgeRelayer                     |                  AntChainBridgePluginServer                  | BIF BCDNS Credential Server |
 | :------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :-------------------------: |
+|     v0.1.1     | [v0.2.1](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.2.1) | [v0.1.0](https://github.com/AntChainOpenLabs/AntChainBridgeRelayer/releases/tag/v0.1.0) | [v0.2.2](https://github.com/AntChainOpenLabs/AntChainBridgePluginServer/releases/tag/v0.2.2) |       v1.0.0-SNAPSHOT       |
 |     v0.1.0     | [v0.2.0](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.2.0) | [v0.1.0](https://github.com/AntChainOpenLabs/AntChainBridgeRelayer/releases/tag/v0.1.0) | [v0.2.1](https://github.com/AntChainOpenLabs/AntChainBridgePluginServer/releases/tag/v0.2.1) |       v1.0.0-SNAPSHOT       |
 |       \        | [v0.1.2](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.1.2) |                              \                               | [v0.2.0](https://github.com/AntChainOpenLabs/AntChainBridgePluginServer/releases/tag/v0.2.0) |              \              |
 |       \        | [v0.1.1](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.1.1) |                              \                               | [v0.1.2-SNAPSHOT](https://github.com/AntChainOpenLabs/AntChainBridgePluginServer/releases/tag/v0.1.2-SNAPSHOT) |              \              |
@@ -40,6 +37,7 @@ TODO：provides more scripts for this
 
 | AntChainBridgePluginSDK                                      | Ethereum BBC Plugin                                          | EOS BBC Plugin                                               |
 | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [v0.2.1]([v0.2.1](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.2.1)) | [simple-ethereum-bbc-v0.1.1](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/simple-ethereum-bbc-v0.1.1) | [eos-bbc-v0.1.2](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/eos-bbc-v0.1.2) |
 | [v0.2.0](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.2.0) | [simple-ethereum-bbc-v0.1.0](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/simple-ethereum-bbc-v0.1.0) | [eos-bbc-v0.1.1](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/eos-bbc-v0.1.1) |
 | [v0.1.2](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.1.2) | [simple-ethereum-bbc-v0.1.0](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/simple-ethereum-bbc-v0.1.0) | [eos-bbc-v0.1-SNAPSHOT](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/eos-bbc-v0.1-SNAPSHOT) |
 | [v0.1.1](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/v0.1.1) | [simple-ethereum-bbc-v0.1-SNAPSHOT](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/releases/tag/simple-ethereum-bbc-v0.1-SNAPSHOT) | \                                                            |
