@@ -1,6 +1,6 @@
 <div align="center">
   <img alt="am logo" src="https://gw.alipayobjects.com/zos/bmw-prod/3ee4adc7-1960-4dbf-982e-522ac135a0c0.svg" width="250" >
-  <h1 align="center">FISCO-BCOS Plugin</h1>
+  <h1 align="center">FISCO-BCOS v3 Plugin</h1>
   <p align="center">
     <a href="http://makeapullrequest.com">
       <img alt="pull requests welcome badge" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat">
@@ -9,212 +9,97 @@
 </div>
 
 
-# Build
 
-1. Run the following command to generate contracts abi code:
+| 说明              | 版本              |
+|-----------------|-----------------|
+| ⭐️ fisco-sdk-java | `3.8.0`         |
+| ✅ 测试通过的 fisco   | `3.11.0`标准链 |
+| 🔄 TODO            | `3.11.0`国密链     |
 
->The solidity contract used by the current demo is exactly the same as
-> the solidity contract source file of the Ethereum demo,
-> but the java code generation method is different.
-> The contract generation method of FISCO-BCOS is as follows.
+# 介绍
 
-- Get console tool for FISCO-BCOS
-```shell
-mkdir -p ~/fisco && cd ~/fisco
-# Fetch console
-curl -#LO https://github.com/FISCO-BCOS/console/releases/download/v3.6.0/download_console.sh
+在本路径之下，实现了fisco-bcos的异构链接入插件，包括链下插件及链上插件部分
 
-# If you are unable to execute the above commands for a long time due to network problems, please try the following commands:
-curl -#LO https://gitee.com/FISCO-BCOS/console/raw/master/tools/download_console.sh
+- **offchain-plugin**：链下插件，使用maven管理的Java工程，使用maven编译即可。基于fisco`3.8.0`版本的[java-sdk](https://github.com/FISCO-BCOS/java-sdk)开发。
 
-bash download_console.sh
-```
-- Place the contract in the contract directory of the console
-```shell
-cp -r /onchain-plugin/solidity/* ~/fisco/console/contracts/solidity
-```
-- Generate Java code, abi file and bin file 
-```shell
-cd ~/fisco/console
-bash contract2java.sh solidity -p com.alipay.antchain.bridge.plugins.fiscobcos -s ./contracts/solidity/sys-contract/AuthMsg.sol
-bash contract2java.sh solidity -p com.alipay.antchain.bridge.plugins.fiscobcos -s ./contracts/solidity/sys-contract/SDPMsg.sol
-bash contract2java.sh solidity -p com.alipay.antchain.bridge.plugins.fiscobcos -s ./contracts/solidity/sys-contract/AppContract.sol
-```
--  Copy result to offchain directory
+# 用法
 
-```shell
-cp -r ~/fisco/console/contracts/sdk/java/com/alipay/antchain/bridge/plugins/fiscobcos/*  /offchain-plugin/src/main/java/com/alipay/antchain/bridge/plugins/fiscobcos/abi
-```
+## 构建
 
-2. Then execute the compile command in the plugin project directory 
-   to get the jar for use as a plugin
+在offchain-plugin下通过`mvn clean package`编译插件Jar包，可以在target下找到`fiscobcos-acb-plugin-1.0.0-plugin.jar`
 
-```shell
-mvn clean package -Dmaven.test.skip=true
-```
+## 使用
 
-# Run Demo
+参考[插件服务](https://github.com/AntChainOpenLabs/AntChainBridge/blob/main/acb-pluginserver/README.md)（PluginServer, PS）的使用，将Jar包放到指定路径，通过PS加载即可。
 
-## Generate configuration file
+### 配置文件
 
-Change directory to blockchain certificate path like  `~/fisco/127.0.0.1/sdk`
+当在AntChainBridge的Relayer服务注册fisco-bcos3.0时，需要指定PS和链类型（fiscobcos），同时需要提交一个fisco链的配置。
 
-Run generate.sh
+fisco-bcos2.0链的配置文件`fiscobcos.json`主要包括链ssl证书信息和节点网络连接信息。
 
-```sh
-#!/bin/bash
+#### 标准链配置文件
 
-# Read the contents of certificate files and store them as variables
-CA_CERT=$(awk '{printf "%s\\n", $0}' ca.crt)
-SSL_CERT=$(awk '{printf "%s\\n", $0}' sdk.crt)
-SDK_KEY=$(awk '{printf "%s\\n", $0}' sdk.key)
+当fisco链为标准链时，配置文件大致如下（配置文件中涉及证书路径均为绝对路径）：
 
-# Create fiscobcos.json
-cat > fiscobcos.json << EOF
+```json
 {
-  "caCert": "$CA_CERT",
-  "sslCert": "$SSL_CERT",
-  "sslKey": "$SDK_KEY",
-  "connectPeer": "your_IP:your_port",
-  "groupID": "your_group"
-}
-EOF
-
-```
-
-Copy fiscobcos.json to relayer server
-
-## Prepare contracts
-
-### Create file for contracts code
-
-```sh
-cd ~/fisco/console
-touch contracts/solidity/SenderContract.sol
-touch contracts/solidity/ReceiverContract.sol
-```
-
-```sol
-pragma solidity ^0.8.0;
-
-interface ProtocolInterface {
-    function sendMessage(
-        string calldata _destination_domain,
-        bytes32 _receiver,
-        bytes calldata _message
-    ) external;
-
-    function sendUnorderedMessage(
-        string calldata _destination_domain,
-        bytes32 _receiver,
-        bytes calldata _message
-    ) external;
-}
-
-contract SenderContract {
-    address sdp_address;
-
-    function setSdpMSGAddress(address _sdp_address) public {
-        sdp_address = _sdp_address;
-    }
-
-    function send(
-        bytes32 receiver,
-        string memory domain,
-        bytes memory _msg
-    ) public {
-        ProtocolInterface sdp = ProtocolInterface(sdp_address);
-        sdp.sendMessage(domain, receiver, _msg);
-    }
-
-    function sendUnordered(
-        bytes32 receiver,
-        string memory domain,
-        bytes memory _msg
-    ) public {
-        ProtocolInterface sdp = ProtocolInterface(sdp_address);
-        sdp.sendUnorderedMessage(domain, receiver, _msg);
-    }
+  "certPath": "/path/to/sdk",
+  "caCert": "/path/to/sdk/ca.crt",
+  "sslCert": "/path/to/sdk/sdk.crt",
+  "sslKey": "/path/to/sdk/sdk.key",
+  "connectPeer": "127.0.0.1:20200",
+  "groupID": "1"
 }
 ```
 
-```sh
-pragma solidity ^0.8.0;
+- certPath：sdk证书目录路径
+- caCert：sdk ca证书路径
+- sslCert：sdk ssl证书路径
+- sslKey：sdl ssl私钥路径
+- connectPeer：连接节点ip及端口
+- groupID：连接节点所在groupId，默认为1
 
-contract ReceiverContract {
-    bytes last_msg;
-    bytes last_uo_msg;
 
-    event amNotify(string key, bytes32 value, string enterprise);
+#### 国密链配置文件
 
-    function recvMessage(
-        string memory domain_name,
-        bytes32 author,
-        bytes memory message
-    ) public {
-        require(message.length != 32, "32B");
-        last_msg = message;
-        emit amNotify(domain_name, author, string(message));
-    }
+当fisco链为国密链时，配置文件大致如下：
 
-    function getLastMsg() public view returns (bytes memory) {
-        return last_msg;
-    }
-
-    function recvUnorderedMessage(
-        string memory domain_name,
-        bytes32 author,
-        bytes memory message
-    ) public {
-        require(message.length != 32, "32B");
-        last_uo_msg = message;
-        emit amNotify(domain_name, author, string(message));
-    }
-
-    function getLastUnorderedMsg() public view returns (bytes memory) {
-        return last_uo_msg;
-    }
+```json
+{
+  "certPath": "/path/to/sdk/gm",
+  "caCert": "/path/to/sdk/gm/gmca.crt",
+  "sslCert": "/path/to/sdk/gm/gmsdk.crt",
+  "sslKey": "/path/to/sdk/gm/gmsdk.key",
+  "enSslCert": "/path/to/sdk/gm/gmensdk.crt",
+  "enSslKey": "/path/to/sdk/gm/gmensdk.key",
+  "connectPeer": "127.0.0.1:20200",
+  "groupID": "1",
+  "useSMCrypto": "true"
 }
 ```
+国密链配置文件中多链以下几项：
+- enSslCert：sdk 国密ssl证书路径
+- enSslKey：sdk 国密ssl私钥路径
+- useSMCrypto：国密链标识，国密链需要添加该标识，标准链默认为`false`
 
-### Start  console
+[参考fisco2.0官方安装文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/docs/quick_start/air_installation.html)，
+这些证书均可以在链的安装目录`node/127.0.0.1/sdk`下找到，例如fisco3.0国密链的相应安装目录应如下：
 
-```sh
-./start.sh
+```shell
+ $ tree sdk
+sdk
+├── ca.crt
+├── cert.cnf
+├── gm
+│   ├── gmca.crt
+│   ├── gmensdk.crt
+│   ├── gmensdk.key
+│   ├── gmsdk.crt
+│   ├── gmsdk.key
+│   └── gmsdk.publickey
+├── sdk.crt
+└── sdk.key
+
+2 directories, 10 files
 ```
-
-### Deploy contracts
-
-```sh
-deploy SenderContract
-deploy ReceiverContract
-```
-
-### Set SDP address
-
-```sh
-call SenderContract {SenderContractAddress} setSdpMSGAddress "{SDPContractAddress}"
-```
-
-
-
-## Configure  authorization on relayer
-
-```sh
-relayer:> add-cross-chain-msg-acl --grantDomain {domain1} --grantIdentity {SenderContractAddress} --ownerDomain {domain2} --ownerIdentity {ReceiverContractAddress}
-```
-
-## Send and receive msg
-
-### Send
-
-```sh
-call SenderContract {SenderContractAddress} sendUnordered "0x000000000000000000000000{ReceiverContractAddress}" "{domain2}" "{Msg}"
-```
-
-### Receive
-
-```sh
-call ReceiverContract {ReceiverContractAddress} getLastUnorderedMsg
-```
-
