@@ -56,7 +56,7 @@ SDK共有六个部分，包括：
 
 - **antchain-bridge-bcdns**：主要包含了接口`IBlockChainDomainNameService`，描述了一个BCDNS客户端应该有的功能；
 
-- **antchain-bridge-bcdns-factory**：包含一个工厂类，支持依据类型创建BCDNS客户端，目前支持星火链网（BIF）的BCDNS客户端和Embedded BCDNS的实现，详细使用可以参考[wiki](https://github.com/AntChainOpenLab/AntChainBridgePluginSDK/wiki)中“如何实现跨链”的内容；
+- **antchain-bridge-bcdns-factory**：包含一个工厂类，支持依据类型创建BCDNS客户端，目前支持星火链网（BIF）的BCDNS客户端和Embedded BCDNS的实现，详细使用可以参考[wiki](https://github.com/AntChainOpenLabs/AntChainBridge/wiki)中“如何实现跨链”的内容；
 
 - **antchain-bridge-ptc**：包含了PTC服务要求实现的接口和部分数据模型；
 
