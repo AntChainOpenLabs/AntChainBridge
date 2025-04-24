@@ -730,53 +730,7 @@ public class BifchainBBCService extends AbstractBBCService {
                 HexUtil.encodeHexStr(rawMessage), this.bbcContext.getAuthMessageContract().getContractAddress());
 
         try {
-            // 2. verify PTC sign
-            ThirdPartyProof thirdPartyProof = decodeTpProofFromMsg(rawMessage);
-            if (!hasTpBta(thirdPartyProof.getTpbtaCrossChainLane(), thirdPartyProof.getTpbtaVersion())) {
-                throw new RuntimeException("tb-bta not found");
-            }
-            ThirdPartyBlockchainTrustAnchor thirdPartyBlockchainTrustAnchor = getTpBta(thirdPartyProof.getTpbtaCrossChainLane(), thirdPartyProof.getTpbtaVersion());
-
-            ObjectIdentity objectIdentity = thirdPartyBlockchainTrustAnchor.getSignerPtcCredentialSubject().getApplicant();
-            if (!hasPTCTrustRoot(objectIdentity)) {
-                throw new RuntimeException("no ptc trust root found");
-            }
-            if (!hasPTCVerifyAnchor(objectIdentity, thirdPartyBlockchainTrustAnchor.getPtcVerifyAnchorVersion())) {
-                throw new RuntimeException("no ptc verify anchor found");
-            }
-
-            CommitteeEndorseRoot committeeEndorseRoot = CommitteeEndorseRoot.decode(thirdPartyBlockchainTrustAnchor.getEndorseRoot());
-            CommitteeEndorseProof committeeEndorseProof = CommitteeEndorseProof.decode(thirdPartyProof.getRawProof());
-            if (!StrUtil.equals(committeeEndorseRoot.getCommitteeId(), committeeEndorseProof.getCommitteeId())) {
-                throw new RuntimeException("committee id in proof not equal with the one in endorse root");
-            }
-
-            byte[] encodedToSign = thirdPartyProof.getEncodedToSign();
-            int optinalCorrect = 0;
-            for (int i = 0; i < committeeEndorseRoot.getEndorsers().size(); i++) {
-                NodeEndorseInfo info = committeeEndorseRoot.getEndorsers().get(i);
-                boolean res = false;
-                for (int j = 0; j < committeeEndorseProof.getSigs().size(); j++) {
-                    if (info.getNodeId().equals(committeeEndorseProof.getSigs().get(j).getNodeId())) {
-                        res = SignAlgoEnum.getByName(committeeEndorseProof.getSigs().get(j).getSignAlgo().getName())
-                                .getSigner()
-                                .verify(info.getPublicKey().getPublicKey(), encodedToSign, committeeEndorseProof.getSigs().get(j).getSig());
-                        if (res && !info.isRequired()) {
-                            optinalCorrect++;
-                            break;
-                        }
-                    }
-                }
-
-                if (!res && info.isRequired()) {
-                    throw new RuntimeException("ptc sign verify failed");
-                }
-            }
-
-            if (!committeeEndorseRoot.getPolicy().getThreshold().check(optinalCorrect)) {
-                throw new RuntimeException("ptc sign verify failed");
-            }
-
+            // 2. relay auth message
             String contractAddress = this.bbcContext.getAuthMessageContract().getContractAddress();
             String invokeInput = StrUtil.format("{\"function\":\"recvPkgFromRelayer(bytes)\",\"args\":\"'{}'\"}", HexUtil.encodeHexStr(rawMessage));
             BIFContractInvokeRequest request = createBIFContractInvokeRequest(contractAddress, invokeInput);
