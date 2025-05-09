@@ -10,85 +10,85 @@ uint16 constant TAG_COMMITTEE_ID = 0x00;
 uint16 constant TAG_POLICY = 0x01;
 uint16 constant TAG_ENDORSERS = 0x02;
 
-    struct CommitteeEndorseRoot {
-        string committeeId;
-        OptionalEndorsePolicy policy;
-        NodeEndorseInfo[] endorsers;
-    }
+struct CommitteeEndorseRoot {
+    string committeeId;
+    OptionalEndorsePolicy policy;
+    NodeEndorseInfo[] endorsers;
+}
 
 // tags for NodeEndorseInfo
 uint16 constant TAG_NODE_ID = 0x00;
 uint16 constant TAG_REQUIRED = 0x01;
 uint16 constant TAG_PUBLIC_KEY = 0x02;
 
-    struct NodeEndorseInfo {
-        string nodeId;
-        bool required;
-        NodePublicKeyEntry publicKey;
-    }
+struct NodeEndorseInfo {
+    string nodeId;
+    bool required;
+    NodePublicKeyEntry publicKey;
+}
 
 // tags for NodePublicKeyEntry
 uint16 constant TAG_KEY_ID = 0x00;
 uint16 constant TAG_RAW_PUBKEY = 0x01;
 
-    struct NodePublicKeyEntry {
-        string keyId;
-        bytes rawPublicKey;
-    }
+struct NodePublicKeyEntry {
+    string keyId;
+    bytes rawPublicKey;
+}
 
 // tags for OptionalEndorsePolicy
 uint16 constant TAG_THRESHOLD = 0x00;
 
-    struct OptionalEndorsePolicy {
-        Threshold threshold;
-    }
+struct OptionalEndorsePolicy {
+    Threshold threshold;
+}
 
 // tags for Threshold
 uint16 constant TAG_OPERATOR = 0x00;
 uint16 constant TAG_THRESHOLD_NUM = 0x01;
 
-    struct Threshold {
-        string operator;
-        uint32 threshold;
-    }
+struct Threshold {
+    string operator;
+    uint32 threshold;
+}
 
 // tags for CommitteeVerifyAnchor
 uint16 constant TAG_CVA_COMMITTEE_ID = 0x00;
 uint16 constant TAG_CVA_ANCHORS = 0x01;
 
-    struct CommitteeVerifyAnchor {
-        string committeeId;
-        NodeAnchorInfo[] anchors;
-    }
+struct CommitteeVerifyAnchor {
+    string committeeId;
+    NodeAnchorInfo[] anchors;
+}
 
 // tags for NodeAnchorInfo
 uint16 constant TAG_NAI_NODE_ID = 0x00;
 uint16 constant TAG_NAI_NODE_PUBKEYS = 0x01;
 
-    struct NodeAnchorInfo {
-        string nodeId;
-        NodePublicKeyEntry[] nodePublicKeys;
-    }
+struct NodeAnchorInfo {
+    string nodeId;
+    NodePublicKeyEntry[] nodePublicKeys;
+}
 
 // tags for CommitteeEndorseProof
 uint16 constant TAG_CEP_COMMITTEE_ID = 0x00;
 uint16 constant TAG_CEP_SIGS = 0x01;
 
-    struct CommitteeEndorseProof {
-        string committeeId;
-        CommitteeNodeProof[] sigs;
-    }
+struct CommitteeEndorseProof {
+    string committeeId;
+    CommitteeNodeProof[] sigs;
+}
 
 // tags for CommitteeNodeProof
 uint16 constant TAG_CNP_NODE_ID = 0x00;
 uint16 constant TAG_CNP_SIGN_ALGO = 0x01;
 uint16 constant TAG_CNP_SIG_HEX = 0x02;
 
-    struct CommitteeNodeProof {
-        string nodeId;
-        string signAlgo;
-        bytes signature;
-    }
+struct CommitteeNodeProof {
+    string nodeId;
+    string signAlgo;
+    bytes signature;
+}
 
 library CommitteeLib {
 
@@ -116,13 +116,13 @@ library CommitteeLib {
 
     function verifyTpBta(PTCVerifyAnchor memory va, TpBta memory tpBta) internal returns (bool) {
         require(
-            TLVUtils.getUint256FromBytes(va.version) == TLVUtils.getUint256FromBytes(tpBta.ptcVerifyAnchorVersion),
+            TLVUtils.getUint256FromBytes(va.version) == TLVUtils.getUint256FromBytes(tpBta.ptcVerifyAnchorVersion), 
             "verify anchor version not equal"
         );
 
         CommitteeVerifyAnchor memory cva = decodeCommitteeVerifyAnchorFrom(va.anchor);
         CommitteeEndorseProof memory ceProof = decodeCommitteeEndorseProofFrom(tpBta.endorseProof);
-
+                
         return cva.verifyCommitteeEndorseProof(ceProof, tpBta);
     }
 
@@ -131,14 +131,14 @@ library CommitteeLib {
 
         bytes memory encodedToSign = tpBta.getEncodedToSign();
         uint correct = 0;
-        for (uint i = 0; i < ceProof.sigs.length; i++)
+        for (uint i = 0; i < ceProof.sigs.length; i++) 
         {
             CommitteeNodeProof memory proof = ceProof.sigs[i];
             require(proof.signAlgo.equal(KECCAK256_WITH_SECP256K1), "only support KECCAK256_WITH_SECP256K1 sig");
             for (uint j = 0; j < cva.anchors.length; j++) {
                 if (cva.anchors[j].nodeId.equal(proof.nodeId)) {
                     bool res = false;
-                    for (uint k = 0; k < cva.anchors[j].nodePublicKeys.length; k++)
+                    for (uint k = 0; k < cva.anchors[j].nodePublicKeys.length; k++) 
                     {
                         res = AcbCommons.verifySig(
                             proof.signAlgo,
@@ -169,39 +169,23 @@ library CommitteeLib {
         require(cer.committeeId.equal(ceProof.committeeId), "committee id in proof not equal with the one in endorse root");
 
         bytes memory encodedToSign = tpProof.getEncodedToSign();
-        uint32 optionalCorrect = 0;
-
-        // Preprocessing: create a fixed-size boolean array to mark the signature status to avoid duplicate lookups
-        bool[] memory verifiedNodes = new bool[](cer.endorsers.length);
-        uint[] memory proofIndices = new uint[](cer.endorsers.length);
-
-        // build the mapping from node ID to signature index
-        for (uint i = 0; i < cer.endorsers.length; i++) {
-            proofIndices[i] = type(uint).max; // Initialized to the maximum value to indicate not found
-            for (uint j = 0; j < ceProof.sigs.length; j++) {
-                if (cer.endorsers[i].nodeId.equal(ceProof.sigs[j].nodeId)) {
-                    proofIndices[i] = j;
-                    break;
-                }
-            }
-        }
-
-        // verifying signatures
-        for (uint i = 0; i < cer.endorsers.length; i++) {
+        uint32 optinalCorrect = 0;
+        for (uint i = 0; i < cer.endorsers.length; i++)
+        {
             NodeEndorseInfo memory info = cer.endorsers[i];
             bool res = false;
-
-            if (proofIndices[i] != type(uint).max) {
-                CommitteeNodeProof memory proof = ceProof.sigs[proofIndices[i]];
-                res = AcbCommons.verifySig(
-                    proof.signAlgo,
-                    info.publicKey.getRawPublicKey(),
-                    encodedToSign,
-                    proof.signature
-                );
-                if (res) {
-                    optionalCorrect++;
-                    verifiedNodes[i] = true;
+            for (uint j = 0; j < ceProof.sigs.length; j++) {
+                if (info.nodeId.equal(ceProof.sigs[j].nodeId)) {
+                    res = AcbCommons.verifySig(
+                        ceProof.sigs[j].signAlgo,
+                        info.publicKey.getRawPublicKey(),
+                        encodedToSign,
+                        ceProof.sigs[j].signature
+                    );
+                    if (res && !info.required) {
+                        optinalCorrect++;
+                        break;
+                    }
                 }
             }
 
@@ -211,7 +195,7 @@ library CommitteeLib {
             }
         }
 
-        return cer.policy.threshold.check(optionalCorrect);
+        return cer.policy.threshold.check(optinalCorrect);
     }
 
     function getRawPublicKey(
@@ -248,7 +232,7 @@ library CommitteeLib {
 
         uint totalSize = 0;
         bytes[] memory rawEndorsers = new bytes[](self.endorsers.length);
-        for (uint i = 0; i < self.endorsers.length; i++)
+        for (uint i = 0; i < self.endorsers.length; i++) 
         {
             rawEndorsers[i] = self.endorsers[i].encode();
             totalSize += rawEndorsers[i].length;
@@ -266,9 +250,9 @@ library CommitteeLib {
     }
 
     function decodeCommitteeEndorseRootFrom(bytes memory rawData)
-    internal
-    pure
-    returns (CommitteeEndorseRoot memory)
+        internal
+        pure
+        returns (CommitteeEndorseRoot memory)
     {
         CommitteeEndorseRoot memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -313,9 +297,9 @@ library CommitteeLib {
     }
 
     function decodeNodeEndorseInfoFrom(bytes memory rawData)
-    internal
-    pure
-    returns (NodeEndorseInfo memory)
+        internal
+        pure
+        returns (NodeEndorseInfo memory)
     {
         NodeEndorseInfo memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -350,9 +334,9 @@ library CommitteeLib {
     }
 
     function decodeNodePublicKeyEntryFrom(bytes memory rawData)
-    internal
-    pure
-    returns (NodePublicKeyEntry memory)
+        internal
+        pure
+        returns (NodePublicKeyEntry memory)
     {
         NodePublicKeyEntry memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -381,9 +365,9 @@ library CommitteeLib {
     }
 
     function decodeOptionalEndorsePolicyFrom(bytes memory rawData)
-    internal
-    pure
-    returns (OptionalEndorsePolicy memory)
+        internal
+        pure
+        returns (OptionalEndorsePolicy memory)
     {
         OptionalEndorsePolicy memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -409,7 +393,7 @@ library CommitteeLib {
             return n <= self.threshold;
         } else if (self.operator.equal("!=")) {
             return n != self.threshold;
-        } else {
+        } else { 
             revert("no operator matched");
         }
     }
@@ -429,9 +413,9 @@ library CommitteeLib {
     }
 
     function decodeThresholdFrom(bytes memory rawData)
-    internal
-    pure
-    returns (Threshold memory)
+        internal
+        pure
+        returns (Threshold memory)
     {
         Threshold memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -455,7 +439,7 @@ library CommitteeLib {
 
         uint totalSize = 0;
         bytes[] memory rawNodePublicKeys = new bytes[](self.nodePublicKeys.length);
-        for (uint i = 0; i < self.nodePublicKeys.length; i++)
+        for (uint i = 0; i < self.nodePublicKeys.length; i++) 
         {
             rawNodePublicKeys[i] = self.nodePublicKeys[i].encode();
             totalSize += rawNodePublicKeys[i].length;
@@ -473,9 +457,9 @@ library CommitteeLib {
     }
 
     function decodeNodeAnchorInfoFrom(bytes memory rawData)
-    internal
-    pure
-    returns (NodeAnchorInfo memory)
+        internal
+        pure
+        returns (NodeAnchorInfo memory)
     {
         NodeAnchorInfo memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -505,7 +489,7 @@ library CommitteeLib {
 
         uint totalSize = 0;
         bytes[] memory rawAnchors = new bytes[](self.anchors.length);
-        for (uint i = 0; i < self.anchors.length; i++)
+        for (uint i = 0; i < self.anchors.length; i++) 
         {
             rawAnchors[i] = self.anchors[i].encode();
             totalSize += rawAnchors[i].length;
@@ -523,9 +507,9 @@ library CommitteeLib {
     }
 
     function decodeCommitteeVerifyAnchorFrom(bytes memory rawData)
-    internal
-    pure
-    returns (CommitteeVerifyAnchor memory)
+        internal
+        pure
+        returns (CommitteeVerifyAnchor memory)
     {
         CommitteeVerifyAnchor memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -568,9 +552,9 @@ library CommitteeLib {
     }
 
     function decodeCommitteeNodeProofFrom(bytes memory rawData)
-    internal
-    pure
-    returns (CommitteeNodeProof memory)
+        internal
+        pure
+        returns (CommitteeNodeProof memory)
     {
         CommitteeNodeProof memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);
@@ -595,7 +579,7 @@ library CommitteeLib {
         );
         uint totalSize = 0;
         bytes[] memory rawSigs = new bytes[](self.sigs.length);
-        for (uint i = 0; i < self.sigs.length; i++)
+        for (uint i = 0; i < self.sigs.length; i++) 
         {
             rawSigs[i] = self.sigs[i].encode();
             totalSize += rawSigs[i].length;
@@ -613,9 +597,9 @@ library CommitteeLib {
     }
 
     function decodeCommitteeEndorseProofFrom(bytes memory rawData)
-    internal
-    pure
-    returns (CommitteeEndorseProof memory)
+        internal
+        pure
+        returns (CommitteeEndorseProof memory)
     {
         CommitteeEndorseProof memory result;
         TLVPacket memory packet = TLVUtils.decodePacket(rawData);

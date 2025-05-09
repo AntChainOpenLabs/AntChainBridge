@@ -162,46 +162,30 @@ library CommitteeLib {
         return 3 * correct > 2 * cva.anchors.length;
     }
 
-   function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof) internal returns (bool) {
+    function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof) internal returns (bool) {
         CommitteeEndorseRoot memory cer = decodeCommitteeEndorseRootFrom(tpBta.endorseRoot);
         CommitteeEndorseProof memory ceProof = decodeCommitteeEndorseProofFrom(tpProof.rawProof);
 
         require(cer.committeeId.equal(ceProof.committeeId), "committee id in proof not equal with the one in endorse root");
 
         bytes memory encodedToSign = tpProof.getEncodedToSign();
-        uint32 optionalCorrect = 0;
-
-        // Preprocessing: create a fixed-size boolean array to mark the signature status to avoid duplicate lookups
-        bool[] memory verifiedNodes = new bool[](cer.endorsers.length);
-        uint[] memory proofIndices = new uint[](cer.endorsers.length);
-
-        // build the mapping from node ID to signature index
-        for (uint i = 0; i < cer.endorsers.length; i++) {
-            proofIndices[i] = type(uint).max; // Initialized to the maximum value to indicate not found
-            for (uint j = 0; j < ceProof.sigs.length; j++) {
-                if (cer.endorsers[i].nodeId.equal(ceProof.sigs[j].nodeId)) {
-                    proofIndices[i] = j;
-                    break;
-                }
-            }
-        }
-
-        // verifying signatures
-        for (uint i = 0; i < cer.endorsers.length; i++) {
+        uint32 optinalCorrect = 0;
+        for (uint i = 0; i < cer.endorsers.length; i++)
+        {
             NodeEndorseInfo memory info = cer.endorsers[i];
             bool res = false;
-
-            if (proofIndices[i] != type(uint).max) {
-                CommitteeNodeProof memory proof = ceProof.sigs[proofIndices[i]];
-                res = AcbCommons.verifySig(
-                    proof.signAlgo,
-                    info.publicKey.getRawPublicKey(),
-                    encodedToSign,
-                    proof.signature
-                );
-                if (res) {
-                    optionalCorrect++;
-                    verifiedNodes[i] = true;
+            for (uint j = 0; j < ceProof.sigs.length; j++) {
+                if (info.nodeId.equal(ceProof.sigs[j].nodeId)) {
+                    res = AcbCommons.verifySig(
+                        ceProof.sigs[j].signAlgo,
+                        info.publicKey.getRawPublicKey(),
+                        encodedToSign,
+                        ceProof.sigs[j].signature
+                    );
+                    if (res && !info.required) {
+                        optinalCorrect++;
+                        break;
+                    }
                 }
             }
 
@@ -211,7 +195,7 @@ library CommitteeLib {
             }
         }
 
-        return cer.policy.threshold.check(optionalCorrect);
+        return cer.policy.threshold.check(optinalCorrect);
     }
 
     function getRawPublicKey(
