@@ -9,6 +9,7 @@ artifacts
 !plugin-demo/app/**/plugin-testchain-*-plugin.jar
 antchain-bridge-sdk.tar.gz
 **/abi
+!acb-sdk/pluginset/fiscobcos/offchain-plugin/src/main/java/com/alipay/antchain/bridge/plugins/fiscobcos/abi
 scripts/antchain-bridge-sdk/
 scripts/contracts/
 scripts/*.tar.gz
