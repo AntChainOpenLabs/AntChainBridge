@@ -31,7 +31,7 @@
 
 **在开始之前，请您确保安装了maven和JDK，这里推荐使用[openjdk-1.8](https://adoptium.net/zh-CN/temurin/releases/?version=8)版本*
 
-**确保安装了AntChain Bridge Plugin SDK，详情请[见](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK?tab=readme-ov-file#%E6%9E%84%E5%BB%BA)*
+**确保安装了AntChain Bridge Plugin SDK，详情请[见](https://github.com/AntChainOpenLabs/AntChainBridge/blob/main/acb-sdk/README.md)*
 
 > [!IMPORTANT]  
 >
@@ -359,7 +359,7 @@ acb:
 
 上面配置中的`root-private-key-file`和`root-cert-file`，可以通过CLI命令`generate-bcdns-root-cert`来生成，详细用法参考[这里](r-cli/README.md#55-生成BCDNS根证书)。
 
-需要在DB额外创建一些Embedded BCDNS的表，通过这里的SQL[脚本](https://github.com/AntChainOpenLabs/AntChainBridgePluginSDK/tree/main/bcdns-services/embedded-bcdns/embedded-bcdns-state-jdbc-spring-boot-starter/src/main/resources/ddl/mysql/ddl.sql)
+需要在DB额外创建一些Embedded BCDNS的表，通过这里的SQL[脚本](https://github.com/AntChainOpenLabs/AntChainBridge/blob/main/acb-sdk/bcdns-services/embedded-bcdns/embedded-bcdns-state-jdbc-spring-boot-starter/src/main/resources/ddl/mysql/ddl.sql)
 
 重新启动Relayer，启动日志中会看到：
 

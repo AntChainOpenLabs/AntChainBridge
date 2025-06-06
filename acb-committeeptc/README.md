@@ -174,13 +174,13 @@ AADGAAAAAAABAAAAMQIAAQAAAAIEAAgAAAAAAAAAAAAAAAUACAAAAAAAAAAAAAAABgCWAAAAAACQAAAA
 
 ```
 supervisor:> convert-cross-chain-cert-to-pem --base64Input AAAIAgAAAAABAAAAMQEAK...wWf/zi60DKnQ7xaCA==
------BEGIN RELAYER CERTIFICATE-----
+-----BEGIN PROOF TRANSFORMATION COMPONENT CERTIFICATE-----
 AAAIAgAAAAABAAAAMQEAKAAAAGRpZDpiaWQ6ZWY5OVJ6OFRpN3g0aTZ6eUNyUHlG
 aXk5dXRzV0JKVVcCAAEAAAADAwA7AAAAAAA1AAAAAAABAAAAAQEAKAAAAGRpZDpi
 ...
 4QlxLUp70uRK43ECAAcAAABFZDI1NTE5AwBAAAAAbA8zkKXCI4Iwp6KBERXOqKln
 JT/qn36in7+iU6SsNEz0rsJpmEvVRT6adNVY7zS/ni35JwWf/zi60DKnQ7xaCA==
------END RELAYER CERTIFICATE-----
+-----END PROOF TRANSFORMATION COMPONENT CERTIFICATE-----
 ```
 
 把上面的PEM格式PTC跨链证书保存到文件，打开Supervisor CLI配置文件./conf/config.json，找到ptc_certificate字段，把PTC证书文件的路径填到这个字段，要求重启Supervisor CLI。
@@ -285,7 +285,7 @@ generate-ptc-trust-root --committeeNodeIds node1,node2,node3,node4 --committeeNo
 拷贝这个Base64，输入下面命令，将Base64作为ptcTrustRootStr的参数粘贴上去，然后运行即可，这里会向BIF BCDNS发请求注册：
 
 ```
-add-ptc-trust-root --ptcTrustRootStr Qkw2ZHIyM...yUWplbE
+add-ptc-trust-root --ptcTrustRootBase64 Qkw2ZHIyM...yUWplbE
 ```
 
 
