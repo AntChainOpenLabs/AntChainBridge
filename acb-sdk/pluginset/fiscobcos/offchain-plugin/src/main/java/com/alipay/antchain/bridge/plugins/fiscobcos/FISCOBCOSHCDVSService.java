@@ -197,10 +197,10 @@ public class FISCOBCOSHCDVSService extends AbstractHCDVSService {
 
         for (int i = 0; i < signatureListArray.size(); i++) {
             JSONObject signatureInfo = signatureListArray.getJSONObject(i);
-            String indexStr = signatureInfo.getString("index");
+            String indexStr = signatureInfo.getString("sealerIndex");
 
             if (StrUtil.isEmpty(indexStr)) {
-                getHCDVSLogger().warn("签名条目缺少index字段");
+                getHCDVSLogger().warn("签名条目缺少sealerIndex字段");
                 continue;
             }
 
@@ -278,9 +278,6 @@ public class FISCOBCOSHCDVSService extends AbstractHCDVSService {
 
             // 3. 验证区块链接关系：检查parentHash
             String childParentHash = HexUtil.encodeHexStr(stateToVerify.getParentHash());
-            if (!childParentHash.startsWith("0x")) {
-                childParentHash = "0x" + childParentHash;
-            }
 
             if (StrUtil.isEmpty(childParentHash) || !childParentHash.equalsIgnoreCase(parentHashHex)) {
                 getHCDVSLogger().error("区块链接关系验证失败: 子区块parentHash {} 与父区块hash {} 不匹配",

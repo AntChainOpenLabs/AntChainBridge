@@ -110,6 +110,8 @@ public class FISCOBCOSHCDVSServiceTest {
         btaSubjectIdentity.put("consensusNodeInfo", consensusInfo);
         btaSubjectIdentity.put("amContract", AM_CONTRACT);
 
+        System.out.println("btaSubjectIdentity:"+ btaSubjectIdentity);
+
         // 创建BTA
         BTA = BlockchainTrustAnchorFactory.createBTAv1(
                 CHAIN_DOMAIN,

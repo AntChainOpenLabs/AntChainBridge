@@ -40,26 +40,50 @@ fisco-bcos2.0链的配置文件`fiscobcos.json`主要包括链ssl证书信息和
 
 #### 标准链配置文件
 
-当fisco链为标准链时，配置文件大致如下（配置文件中涉及证书路径均为绝对路径）：
+当FISCO链为标准链时，配置文件格式如下：
 
+**证书文件处理：**
+[参考fisco3.0官方安装文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/docs/quick_start/air_installation.html)，在链的安装目录`node/127.0.0.1/sdk`下找到sdk.key、sdk.crt、ca.crt等证书文件，可以使用以下命令转换为字符串格式：
+```bash
+cat sdk.key | awk '{if (NR>1) printf "\\n"; printf "%s", $0}END{printf "\\n"}'
+```
+
+**BCDNS配置：**
+使用[Embedded-BCDNS](https://github.com/AntChainOpenLabs/AntChainBridge/blob/main/acb-relayer/README.md#%E5%90%AF%E5%8A%A8embedded-bcdns)时，需要添加`bcdnsRootCertPem`字段，该字段对应之前生成的embedded-bcdns-root.crt文件内容。
+
+**配置文件示例：**
 ```json
 {
-  "certPath": "/path/to/sdk",
-  "caCert": "/path/to/sdk/ca.crt",
-  "sslCert": "/path/to/sdk/sdk.crt",
-  "sslKey": "/path/to/sdk/sdk.key",
-  "connectPeer": "127.0.0.1:20200",
-  "groupID": "1"
+    "accountFileFormat":"",
+    "bcdnsRootCertPem":"", 
+    "caCert":"",
+    "connectPeer":"",
+    "defaultGroup":"",
+    "disableSsl":"",
+    "groupID":"",
+    "keyStoreDir":"",
+    "messageTimeout":"",
+    "msgScanPolicy":"",
+    "sslCert":"",
+    "sslKey":"",
+    "useSMCrypto":"false"
 }
 ```
 
-- certPath：sdk证书目录路径
-- caCert：sdk ca证书路径
-- sslCert：sdk ssl证书路径
-- sslKey：sdl ssl私钥路径
-- connectPeer：连接节点ip及端口
-- groupID：连接节点所在groupId，默认为1
-
+**配置字段说明：**
+- `accountFileFormat`：账户文件格式
+- `bcdnsRootCertPem`：BCDNS根证书PEM格式内容
+- `caCert`：CA证书内容（字符串格式）
+- `connectPeer`：连接节点的IP地址和端口
+- `defaultGroup`：默认群组设置
+- `disableSsl`：是否禁用SSL连接
+- `groupID`：连接节点所在的群组ID，默认为1
+- `keyStoreDir`：密钥存储目录路径
+- `messageTimeout`：消息超时时间设置
+- `msgScanPolicy`：消息扫描策略
+- `sslCert`：SSL证书内容（字符串格式）
+- `sslKey`：SSL私钥内容（字符串格式）
+- `useSMCrypto`：是否使用国密算法，设置为`false`表示使用标准链
 
 #### 国密链配置文件
 
@@ -83,7 +107,7 @@ fisco-bcos2.0链的配置文件`fiscobcos.json`主要包括链ssl证书信息和
 - enSslKey：sdk 国密ssl私钥路径
 - useSMCrypto：国密链标识，国密链需要添加该标识，标准链默认为`false`
 
-[参考fisco2.0官方安装文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/docs/quick_start/air_installation.html)，
+[参考fisco3.0官方安装文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/docs/quick_start/air_installation.html)，
 这些证书均可以在链的安装目录`node/127.0.0.1/sdk`下找到，例如fisco3.0国密链的相应安装目录应如下：
 
 ```shell
