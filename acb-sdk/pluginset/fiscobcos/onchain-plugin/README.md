@@ -8,10 +8,7 @@
   </p>
 </div>
 
-本仓库包含：
-
-- FISCO BCOS BBC 系统合约
-- 基于 ERC1155 标准的跨链合约
+> FISCO BCOS平台完全兼容Solidity智能合约。如需了解链上插件合约的具体实现，请参考[Ethereum2.0链上插件合约示例](https://github.com/AntChainOpenLabs/AntChainBridge/tree/main/acb-sdk/pluginset/fiscobcos/onchain-plugin)。
 
 ## 开发注意事项
 
