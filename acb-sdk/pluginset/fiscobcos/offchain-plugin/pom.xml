@@ -12,6 +12,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <acb-sdk.version>1.0.0-SNAPSHOT</acb-sdk.version>
     </properties>
 
     <repositories>
@@ -28,7 +29,7 @@
         <dependency>
             <groupId>com.alipay.antchain.bridge</groupId>
             <artifactId>antchain-bridge-plugin-lib</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>${acb-sdk.version}</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
@@ -52,7 +53,7 @@
         <dependency>
             <groupId>com.alipay.antchain.bridge</groupId>
             <artifactId>antchain-bridge-spi</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>${acb-sdk.version}</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
@@ -178,7 +179,7 @@
         <dependency>
             <groupId>com.alipay.antchain.bridge</groupId>
             <artifactId>antchain-bridge-commons</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>${acb-sdk.version}</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
@@ -219,7 +220,7 @@
         <dependency>
             <groupId>com.alipay.antchain.bridge</groupId>
             <artifactId>antchain-bridge-ptc</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>${acb-sdk.version}</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>

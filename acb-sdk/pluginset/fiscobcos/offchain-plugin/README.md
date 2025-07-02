@@ -20,7 +20,7 @@
 
 在本路径之下，实现了fisco-bcos的异构链接入插件，包括链下插件及链上插件部分
 
-- **offchain-plugin**：链下插件，使用maven管理的Java工程，使用maven编译即可。基于fisco`3.8.0`版本的[java-sdk](https://github.com/FISCO-BCOS/java-sdk)开发。
+- **offchain-plugin**：链下插件，使用maven管理的Java工程，基于JDK 21开发，使用maven编译即可。基于fisco`3.8.0`版本的[java-sdk](https://github.com/FISCO-BCOS/java-sdk)开发。
 
 # 用法
 
@@ -36,7 +36,7 @@
 
 当在AntChainBridge的Relayer服务注册fisco-bcos3.0时，需要指定PS和链类型（fiscobcos），同时需要提交一个fisco链的配置。
 
-fisco-bcos2.0链的配置文件`fiscobcos.json`主要包括链ssl证书信息和节点网络连接信息。
+fisco-bcos3.0链的配置文件`fiscobcos.json`主要包括链ssl证书信息和节点网络连接信息。
 
 #### 标准链配置文件
 
