@@ -18,6 +18,7 @@ package com.alipay.antchain.bridge.plugins.fiscobcos;
 import java.io.IOException;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.annotation.JSONField;
 import lombok.Getter;
 import lombok.Setter;
@@ -38,6 +39,11 @@ public class FISCOBCOSConfig {
      */
     public static FISCOBCOSConfig fromJsonString(String jsonString) throws IOException {
         return JSON.parseObject(jsonString, FISCOBCOSConfig.class);
+    }
+
+    public enum CrossChainMessageScanPolicyEnum {
+        LOG_FILTER,
+        BLOCK_SCAN
     }
 
     // [cryptoMaterial]
@@ -83,6 +89,15 @@ public class FISCOBCOSConfig {
 
     @JSONField
     private String sdpContractAddressDeployed;
+    
+    @JSONField
+    private String ptcHubContractAddressDeployed;
+
+    @JSONField
+    private String bcdnsRootCertPem;
+
+    @JSONField
+    private CrossChainMessageScanPolicyEnum msgScanPolicy = CrossChainMessageScanPolicyEnum.BLOCK_SCAN;
 
     /**
      * json序列化为字符串
