@@ -8,9 +8,9 @@ import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>requestResponse complex type的 Java 类。
+ * <p>Java class for requestResponse complex type.
  * 
- * <p>以下模式片段指定包含在此类中的预期内容。
+ * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
  * &lt;complexType name="requestResponse"&gt;
@@ -36,7 +36,7 @@ public class RequestResponse {
     protected String _return;
 
     /**
-     * 获取return属性的值。
+     * Gets the value of the return property.
      * 
      * @return
      *     possible object is
@@ -48,7 +48,7 @@ public class RequestResponse {
     }
 
     /**
-     * 设置return属性的值。
+     * Sets the value of the return property.
      * 
      * @param value
      *     allowed object is

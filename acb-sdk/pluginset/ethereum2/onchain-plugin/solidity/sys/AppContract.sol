@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/IContractUsingSDP.sol";
 import "./interfaces/ISDPMessage.sol";
+import "./interfaces/IMonitor.sol";
 import "./lib/utils/Ownable.sol";
 
 contract AppContract is IContractUsingSDP, Ownable {
@@ -14,6 +15,8 @@ contract AppContract is IContractUsingSDP, Ownable {
     mapping(bytes32 => bytes[]) public recvMsg;
 
     mapping(bytes32 => bytes[]) public sendMsg;
+
+    address public monitorAddress;
 
     address public sdpAddress;
 
@@ -31,7 +34,7 @@ contract AppContract is IContractUsingSDP, Ownable {
     event sendCrosschainMsg(string receiverDomain, bytes32 receiver, bytes  message, bool isOrdered);
 
     modifier onlySdpMsg() {
-        require(msg.sender == sdpAddress, "INVALID_PERMISSION");
+        require(msg.sender == sdpAddress, "INVALID_PERMISSION: only sdp message");
         _;
     }
 
@@ -39,20 +42,30 @@ contract AppContract is IContractUsingSDP, Ownable {
         sdpAddress = protocolAddress;
     }
 
-    function recvUnorderedMessage(string memory senderDomain, bytes32 author, bytes memory message) external override onlySdpMsg {
+    modifier onlyMonitorMsg() {
+        require(monitorAddress == msg.sender, "INVALID_PERMISSION: only monitor message");
+        _;
+    }
+
+    function setMonitorContract(address newMonitorAddress) external onlyOwner {
+        monitorAddress = newMonitorAddress;
+    }
+
+    function recvUnorderedMessage(string memory senderDomain, bytes32 author, bytes memory message) external override onlyMonitorMsg {
         recvMsg[author].push(message);
         last_uo_msg = message;
         emit recvCrosschainMsg(senderDomain, author, message, false);
     }
 
-    function recvMessage(string memory senderDomain, bytes32 author, bytes memory message) external override onlySdpMsg {
+    function recvMessage(string memory senderDomain, bytes32 author, bytes memory message) external override onlyMonitorMsg {
         recvMsg[author].push(message);
         last_msg = message;
         emit recvCrosschainMsg(senderDomain, author, message, true);
     }
 
+    // notice: monitor only support the sendV1 version message
     function sendUnorderedMessage(string memory receiverDomain, bytes32 receiver, bytes memory message) external {
-        ISDPMessage(sdpAddress).sendUnorderedMessage(receiverDomain, receiver, message);
+        IMonitor(monitorAddress).sendUnorderedMonitorMessage(receiverDomain, receiver, message);
 
         sendMsg[receiver].push(message);
         emit sendCrosschainMsg(receiverDomain, receiver, message, false);
@@ -60,7 +73,7 @@ contract AppContract is IContractUsingSDP, Ownable {
 
     function sendMessage(string memory receiverDomain, bytes32 receiver, bytes memory message) external{
 
-        ISDPMessage(sdpAddress).sendMessage(receiverDomain, receiver, message);
+        IMonitor(monitorAddress).sendMonitorMessage(receiverDomain, receiver, message);
 
         sendMsg[receiver].push(message);
         emit sendCrosschainMsg(receiverDomain, receiver, message, true);

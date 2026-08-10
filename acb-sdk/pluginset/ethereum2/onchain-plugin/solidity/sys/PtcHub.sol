@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "./interfaces/IPtcHub.sol";
 import "./interfaces/IPtcVerifier.sol";
+import "./interfaces/IMonitorVerifier.sol";
 import "./lib/ptc/PtcLib.sol";
 import "./@openzeppelin/contracts/access/Ownable.sol";
 import "./@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -43,6 +44,8 @@ contract PtcHub is IPtcHub, Ownable, Initializable {
 
     PTCTypeEnum[] public ptcTypeSupported;
 
+    address public monitorVerifierAddr;
+
     constructor(bytes memory rawRootBcdnsCert) {
         _initBcdns(rawRootBcdnsCert);
         _disableInitializers();
@@ -67,6 +70,15 @@ contract PtcHub is IPtcHub, Ownable, Initializable {
         ownerOidToBcdnsDomainSpaceMap[k] = ROOT_DOMAIN_SPACE_ALIAS;
 
         emit NewBcdnsCert(k);
+    }
+
+    function setMonitorVerifier(address newMonitorVerifierAddr) external override onlyOwner {
+        require(newMonitorVerifierAddr != address(0), "PtcHub: invalid monitorPtc contract");
+        monitorVerifierAddr = newMonitorVerifierAddr;
+    }
+
+    function getMonitorVerifier() external view returns (address) {
+        return monitorVerifierAddr;
     }
 
     function updatePTCTrustRoot(bytes calldata rawPtcTrustRoot)
@@ -190,6 +202,7 @@ contract PtcHub is IPtcHub, Ownable, Initializable {
         }
         s.mapByVersion[newTpBta.tpbtaVersion] = rawTpBta;
         emit SaveTpBta(k, newTpBta.tpbtaVersion);
+        IMonitorVerifier(monitorVerifierAddr).updateMonitorNodeEndorseInfo(newTpBta.endorseRoot);
     }
 
     function getTpBta(bytes calldata tpbtaLane, uint32 tpBtaVersion) external override view returns (bytes memory) {
@@ -231,7 +244,7 @@ contract PtcHub is IPtcHub, Ownable, Initializable {
         address verifier = verifierMap[AcbCommons.decodePTCCredentialSubjectFrom(ptr.ptcCrossChainCert.credentialSubject).ptcType];
         require(verifier != address(0x0), "no ptc veifier set");
 
-        bool result = IPtcVerifier(verifier).verifyTpProof(tpbta, tpProof);
+        bool result = IPtcVerifier(verifier).verifyTpProof(tpbta, tpProof, monitorVerifierAddr);
         emit VerifyProof(tpbta.crossChainLane, result);
         require(result, "verify not pass");
     }

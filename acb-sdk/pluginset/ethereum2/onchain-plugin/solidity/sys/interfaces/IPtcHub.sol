@@ -21,6 +21,8 @@ interface IPtcHub {
 
     event VerifyProof(CrossChainLane tpbtaLane, bool result);
 
+    function setMonitorVerifier(address newMonitorVerifierAddr) external;
+
     function updatePTCTrustRoot(bytes calldata rawPtcTrustRoot) external;
 
     function getPTCTrustRoot(bytes calldata ptcOwnerOid) external view returns (bytes memory);

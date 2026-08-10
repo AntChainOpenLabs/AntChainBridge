@@ -11,8 +11,8 @@ contract CommitteePtcVerifier is IPtcVerifier {
         return CommitteeLib.verifyTpBta(va, tpBta);
     }
 
-    function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof) external override returns (bool) {
-        return CommitteeLib.verifyTpProof(tpBta, tpProof);
+    function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof, address monitorPtcAddr) external override returns (bool) {
+        return CommitteeLib.verifyTpProof(tpBta, tpProof, monitorPtcAddr);
     }
 
     function myPtcType() external pure override returns (PTCTypeEnum) {

@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/ISDPMessage.sol";
 import "./interfaces/IAuthMessage.sol";
+import "./interfaces/IContractUsingMonitor.sol";
 import "./interfaces/IContractUsingSDP.sol";
 import "./interfaces/IContractWithAcks.sol";
 import "./lib/sdp/SDPLib.sol";
@@ -16,6 +17,8 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
     using SDPLib for SDPMessageV2;
     using SDPLib for SDPMessageV3;
     using SDPLib for BlockState;
+
+    address public monitorAddress;
 
     address public amAddress;
 
@@ -37,6 +40,11 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
     */
     mapping(bytes32 => bool) sendSDPV3Msgs;
 
+    modifier onlyMonitorMsg() {
+        require(monitorAddress == msg.sender, "SDPMsg: not valid monitor contract");
+        _;
+    }
+
     modifier onlyAM() {
         require(
             amAddress == msg.sender,
@@ -51,6 +59,15 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
 
     function init() external initializer() {
         _transferOwnership(_msgSender());
+    }
+
+    function setMonitorContract(address newMonitorAddress) override external onlyOwner {
+        require(newMonitorAddress != address(0), "SDPMsg: invalid monitor contract");
+        monitorAddress = newMonitorAddress;
+    }
+
+    function getMonitorAddress() external view returns (address) {
+        return monitorAddress;
     }
 
     function setAmContract(address newAmContract) override external onlyOwner {
@@ -70,7 +87,7 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
         return localDomainHash;
     }
 
-    function sendMessage(string calldata receiverDomain, bytes32 receiverID, bytes calldata message) override external {
+    function sendMessage(string calldata receiverDomain, bytes32 receiverID, address senderID, bytes calldata message) override external onlyMonitorMsg {
         _beforeSend(receiverDomain, receiverID, message);
 
         SDPMessage memory sdpMessage = SDPMessage(
@@ -78,18 +95,18 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
                 receiveDomain: receiverDomain,
                 receiver: receiverID,
                 message: message,
-                sequence: _getAndUpdateSendSeq(receiverDomain, msg.sender, receiverID)
+                sequence: _getAndUpdateSendSeq(receiverDomain, senderID, receiverID)
             }
         );
 
         bytes memory rawMsg = sdpMessage.encode();
 
-        IAuthMessage(amAddress).recvFromProtocol(msg.sender, rawMsg);
+        IAuthMessage(amAddress).recvFromProtocol(senderID, rawMsg);
 
         _afterSend();
     }
 
-    function sendUnorderedMessage(string calldata receiverDomain, bytes32 receiverID, bytes calldata message) override external {
+    function sendUnorderedMessage(string calldata receiverDomain, bytes32 receiverID, address senderID, bytes calldata message) override external onlyMonitorMsg {
         _beforeSendUnordered(receiverDomain, receiverID, message);
 
         SDPMessage memory sdpMessage = SDPMessage(
@@ -101,7 +118,7 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
             }
         );
 
-        IAuthMessage(amAddress).recvFromProtocol(msg.sender, sdpMessage.encode());
+        IAuthMessage(amAddress).recvFromProtocol(senderID, sdpMessage.encode());
 
         _afterSendUnordered();
     }
@@ -291,7 +308,7 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
             errMsg = "receiver has no code";
         } else {
             try
-                IContractUsingSDP(receiver).recvMessage(senderDomain, senderID, sdpMessage.message)
+                IContractUsingMonitor(monitorAddress).recvMessageFromSDP(senderDomain, senderID, receiver, sdpMessage.message)
             {
                 res = true;
             } catch Error(
@@ -307,8 +324,8 @@ contract SDPMsg is ISDPMessage, Ownable, Initializable {
     }
 
     function _routeUnorderedMessage(string calldata senderDomain, bytes32 senderID, SDPMessage memory sdpMessage) internal {
-        IContractUsingSDP(sdpMessage.getReceiverAddress())
-                .recvUnorderedMessage(senderDomain, senderID, sdpMessage.message);
+        IContractUsingMonitor(monitorAddress)
+                .recvUnorderedMessageFromSDP(senderDomain, senderID, sdpMessage.getReceiverAddress(), sdpMessage.message);
     }
 
     function _processSDPv2(string calldata senderDomain, bytes32 senderID, bytes memory pkg) internal {

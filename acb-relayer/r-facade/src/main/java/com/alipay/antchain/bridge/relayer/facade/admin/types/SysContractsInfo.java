@@ -17,6 +17,9 @@ public class SysContractsInfo {
     @JSONField(name = "ptc_contract")
     private String ptcContract;
 
+    @JSONField(name = "monitor_contract")
+    private String monitorContract;
+
     @JSONField(name = "state")
     private String state;
 }

@@ -41,4 +41,6 @@ public interface ISDPWriter {
      * @param domain the domain value
      */
     void setLocalDomain(String domain);
+
+    void setMonitorContract(String contractAddress);
 }

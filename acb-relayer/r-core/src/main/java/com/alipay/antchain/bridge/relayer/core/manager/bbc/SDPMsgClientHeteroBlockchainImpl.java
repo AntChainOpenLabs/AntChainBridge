@@ -24,6 +24,11 @@ public class SDPMsgClientHeteroBlockchainImpl implements ISDPMsgClientContract {
     }
 
     @Override
+    public void setMonitorContract(String monitorContract) {
+        this.bbcServiceClient.setMonitorContract(monitorContract);
+    }
+
+    @Override
     public long querySDPMsgSeqOnChain(String senderDomain, String from, String receiverDomain, String to) {
         try {
             return this.bbcServiceClient.querySDPMessageSeq(senderDomain, from, receiverDomain, to);

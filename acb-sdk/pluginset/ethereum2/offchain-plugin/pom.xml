@@ -239,10 +239,12 @@
                     </soliditySourceFiles>
                     <contract>
                         <includes>
+                            <include>Monitor</include>
                             <include>AuthMsg</include>
                             <include>SDPMsg</include>
                             <include>PtcHub</include>
                             <include>CommitteePtcVerifier</include>
+                            <include>MonitorVerifier</include>
                             <include>AppContract</include>
                             <include>ProxyAdmin</include>
                             <include>TransparentUpgradeableProxy</include>

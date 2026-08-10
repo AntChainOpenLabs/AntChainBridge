@@ -24,6 +24,18 @@ public enum ServerErrorCodeEnum {
 
     SUCCESS(0, "success"),
 
+    BBC_SETUPMONITORMESSAGECONTRACT_ERROR(250, "[bbc] set up monitor contract failed"),
+
+    BBC_SETPROTOCOLINMONITOR_ERROR(251, "[bbc] set protocol in monitor contract failed"),
+
+    BBC_SETMONITORCONTROL_ERROR(252, "[bbc] set monitor control failed"),
+
+    BBC_SETPTCHUBINMONITORVERIFIER_ERROR(253, "[bbc] set ptc hub in monitor verifier failed"),
+
+    BBC_SETMONITORCONTRACT_ERROR(254, "[bbc] set monitor contract failed"),
+
+    BBC_RELAYMONITORORDER_ERROR(255, "[bbc] relay monitor order failed"),
+
     UNSUPPORT_BBC_REQUEST_ERROR(200, "unsupport bbc request type"),
 
     BBC_GET_SERVICE_ERROR(201, "[bbc] get service failed"),

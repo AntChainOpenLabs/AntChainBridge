@@ -89,6 +89,10 @@ public class BlockchainManager implements IBlockchainManager {
 
     private final Map<String, BigInteger> latestVerifyAnchorVersionOnchain = new ConcurrentHashMap<>();
 
+    private static final int MONITOR_CLOSE = 1;
+
+    private static final int MONITOR_OPEN = 2;
+
     @Override
     public void addBlockchain(
             String product,
@@ -926,6 +930,13 @@ public class BlockchainManager implements IBlockchainManager {
             blockchainClient.getSDPMsgClientContract().deployContract();
         }
 
+        if (
+                ObjectUtil.isNull(bbcContext.getMonitorContract())
+                        || ContractStatusEnum.INIT == bbcContext.getMonitorContract().getStatus()
+        ) {
+            blockchainClient.getMonitorClientContract().deployContract();
+        }
+
         boolean isPtcSupport = true;
         if (
                 ObjectUtil.isNull(bbcContext.getPtcContract())
@@ -954,6 +965,13 @@ public class BlockchainManager implements IBlockchainManager {
                     blockchainMeta.getProduct(), blockchainMeta.getBlockchainId(), blockchainMeta.getPluginServerId()
             );
         }
+        if (ObjectUtil.isNull(bbcContext.getMonitorContract()) || StrUtil.isEmpty(bbcContext.getMonitorContract().getContractAddress())) {
+            throw new AntChainBridgeRelayerException(
+                    RelayerErrorCodeEnum.CORE_BLOCKCHAIN_ERROR,
+                    "monitor contract is empty for blockchain ( product: {}, bcId: {}, pluginServer: {})",
+                    blockchainMeta.getProduct(), blockchainMeta.getBlockchainId(), blockchainMeta.getPluginServerId()
+            );
+        }
         if (isPtcSupport && (ObjectUtil.isNull(bbcContext.getPtcContract()) || StrUtil.isEmpty(bbcContext.getPtcContract().getContractAddress()))) {
             throw new AntChainBridgeRelayerException(
                     RelayerErrorCodeEnum.CORE_BLOCKCHAIN_ERROR,
@@ -974,10 +992,25 @@ public class BlockchainManager implements IBlockchainManager {
         blockchainClient.getSDPMsgClientContract()
                 .setAmContract(bbcContext.getAuthMessageContract().getContractAddress());
 
+        blockchainClient.getSDPMsgClientContract()
+                .setMonitorContract(bbcContext.getMonitorContract().getContractAddress());
+
+        blockchainClient.getMonitorClientContract()
+                .setMonitorControl(MONITOR_OPEN);
+
+        blockchainClient.getMonitorClientContract()
+                .setProtocolInMonitor(bbcContext.getSdpContract().getContractAddress());
+
+        if (isPtcSupport) {
+            blockchainClient.getMonitorClientContract()
+                    .setPtcHubInMonitorVerifier(bbcContext.getPtcContract().getContractAddress());
+        }
+
         bbcContext = blockchainClient.queryBBCContext();
 
         blockchainMeta.getProperties().setAmClientContractAddress(bbcContext.getAuthMessageContract().getContractAddress());
         blockchainMeta.getProperties().setSdpMsgContractAddress(bbcContext.getSdpContract().getContractAddress());
+        blockchainMeta.getProperties().setMonitorContractAddress(bbcContext.getMonitorContract().getContractAddress());
         if (isPtcSupport) {
             blockchainMeta.getProperties().setPtcContractAddress(bbcContext.getPtcContract().getContractAddress());
         }

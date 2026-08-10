@@ -43,6 +43,7 @@ import com.alipay.antchain.bridge.commons.bbc.AbstractBBCContext;
 import com.alipay.antchain.bridge.commons.bbc.DefaultBBCContext;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.AuthMessageContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.ContractStatusEnum;
+import com.alipay.antchain.bridge.commons.bbc.syscontract.MonitorContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.SDPContract;
 import com.alipay.antchain.bridge.commons.bcdns.AbstractCrossChainCertificate;
 import com.alipay.antchain.bridge.commons.bcdns.PTCCredentialSubject;
@@ -50,6 +51,7 @@ import com.alipay.antchain.bridge.commons.bcdns.utils.CrossChainCertificateUtil;
 import com.alipay.antchain.bridge.commons.core.am.AuthMessageFactory;
 import com.alipay.antchain.bridge.commons.core.am.IAuthMessage;
 import com.alipay.antchain.bridge.commons.core.base.*;
+import com.alipay.antchain.bridge.commons.core.monitor.*;
 import com.alipay.antchain.bridge.commons.core.ptc.*;
 import com.alipay.antchain.bridge.commons.core.sdp.ISDPMessage;
 import com.alipay.antchain.bridge.commons.core.sdp.SDPMessageFactory;
@@ -60,6 +62,7 @@ import com.alipay.antchain.bridge.commons.utils.crypto.HashAlgoEnum;
 import com.alipay.antchain.bridge.commons.utils.crypto.SignAlgoEnum;
 import com.alipay.antchain.bridge.plugins.ethereum2.abi.AppContract;
 import com.alipay.antchain.bridge.plugins.ethereum2.abi.AuthMsg;
+import com.alipay.antchain.bridge.plugins.ethereum2.abi.Monitor;
 import com.alipay.antchain.bridge.plugins.ethereum2.abi.SDPMsg;
 import com.alipay.antchain.bridge.plugins.ethereum2.conf.Eth2NetworkEnum;
 import com.alipay.antchain.bridge.plugins.ethereum2.conf.EthereumConfig;
@@ -220,7 +223,7 @@ public class EthereumBBCServiceTest {
         nodeEndorseInfo.setPublicKey(nodePubkeyEntry);
 
         NodeEndorseInfo nodeEndorseInfo2 = new NodeEndorseInfo();
-        nodeEndorseInfo2.setNodeId("node2");
+        nodeEndorseInfo2.setNodeId("monitor-node");
         nodeEndorseInfo2.setRequired(false);
         nodeEndorseInfo2.setPublicKey(nodePubkeyEntry);
 
@@ -260,7 +263,7 @@ public class EthereumBBCServiceTest {
                                                 .sign(NODE_PTC_PRIVATE_KEY, tpbta.getEncodedToSign())
                                 ),
                                 new CommitteeNodeProof(
-                                        "node2",
+                                        "monitor-node",
                                         SignAlgoEnum.KECCAK256_WITH_SECP256K1,
                                         SignAlgoEnum.KECCAK256_WITH_SECP256K1.getSigner()
                                                 .sign(NODE_PTC_PRIVATE_KEY, tpbta.getEncodedToSign())
@@ -277,14 +280,14 @@ public class EthereumBBCServiceTest {
 
         CommitteeVerifyAnchor verifyAnchor = new CommitteeVerifyAnchor("committee");
         verifyAnchor.addNode("node1", "default", ((X509PubkeyInfoObjectIdentity) oid).getPublicKey());
-        verifyAnchor.addNode("node2", "default", ((X509PubkeyInfoObjectIdentity) oid).getPublicKey());
+        verifyAnchor.addNode("monitor-node", "default", ((X509PubkeyInfoObjectIdentity) oid).getPublicKey());
         verifyAnchor.addNode("node3", "default", ((X509PubkeyInfoObjectIdentity) oid).getPublicKey());
         verifyAnchor.addNode("node4", "default", ((X509PubkeyInfoObjectIdentity) oid).getPublicKey());
 
         // prepare the network stuff
         CommitteeNetworkInfo committeeNetworkInfo = new CommitteeNetworkInfo("committee");
         committeeNetworkInfo.addEndpoint("node1", "grpcs://0.0.0.0:8080", "");
-        committeeNetworkInfo.addEndpoint("node2", "grpcs://0.0.0.0:8080", "");
+        committeeNetworkInfo.addEndpoint("monitor-node", "grpcs://0.0.0.0:8080", "");
         committeeNetworkInfo.addEndpoint("node3", "grpcs://0.0.0.0:8080", "");
         committeeNetworkInfo.addEndpoint("node4", "grpcs://0.0.0.0:8080", "");
 
@@ -371,16 +374,18 @@ public class EthereumBBCServiceTest {
         EthereumBBCService bbcServiceTmp = new EthereumBBCService();
         bbcServiceTmp.startup(mockValidCtx);
 
-        // set up am and sdp
+        // set up am and sdp and monitor
         bbcServiceTmp.setupAuthMessageContract();
         bbcServiceTmp.setupSDPMessageContract();
+        bbcServiceTmp.setupMonitorContract();
         bbcServiceTmp.setupPTCContract();
         String amAddr = bbcServiceTmp.getContext().getAuthMessageContract().getContractAddress();
         String sdpAddr = bbcServiceTmp.getContext().getSdpContract().getContractAddress();
+        String monitorAddr = bbcServiceTmp.getContext().getMonitorContract().getContractAddress();
         String ptcAddr = bbcServiceTmp.getContext().getPtcContract().getContractAddress();
 
         // start up success
-        AbstractBBCContext ctx = mockValidCtxWithPreDeployedContracts(amAddr, sdpAddr, ptcAddr);
+        AbstractBBCContext ctx = mockValidCtxWithPreDeployedContracts(amAddr, sdpAddr, monitorAddr, ptcAddr);
         EthereumBBCService ethereumBBCService = new EthereumBBCService();
         ethereumBBCService.startup(ctx);
 
@@ -388,6 +393,8 @@ public class EthereumBBCServiceTest {
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ethereumBBCService.getBbcContext().getAuthMessageContract().getStatus());
         Assert.assertEquals(sdpAddr, ethereumBBCService.getBbcContext().getSdpContract().getContractAddress());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ethereumBBCService.getBbcContext().getSdpContract().getStatus());
+        Assert.assertEquals(monitorAddr, ethereumBBCService.getBbcContext().getMonitorContract().getContractAddress());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ethereumBBCService.getBbcContext().getMonitorContract().getStatus());
         Assert.assertEquals(ptcAddr, ethereumBBCService.getBbcContext().getPtcContract().getContractAddress());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ethereumBBCService.getBbcContext().getPtcContract().getStatus());
     }
@@ -399,22 +406,26 @@ public class EthereumBBCServiceTest {
         EthereumBBCService bbcServiceTmp = new EthereumBBCService();
         bbcServiceTmp.startup(mockValidCtx);
 
-        // set up am and sdp
+        // set up am and sdp and monitor
         bbcServiceTmp.setupAuthMessageContract();
         bbcServiceTmp.setupSDPMessageContract();
+        bbcServiceTmp.setupMonitorContract();
         bbcServiceTmp.setupPTCContract();
         String amAddr = bbcServiceTmp.getContext().getAuthMessageContract().getContractAddress();
         String sdpAddr = bbcServiceTmp.getContext().getSdpContract().getContractAddress();
+        String monitorAddr = bbcServiceTmp.getContext().getMonitorContract().getContractAddress();
         String ptcAddr = bbcServiceTmp.getContext().getPtcContract().getContractAddress();
 
         // start up success
         EthereumBBCService ethereumBBCService = new EthereumBBCService();
-        AbstractBBCContext ctx = mockValidCtxWithPreReadyContracts(amAddr, sdpAddr, ptcAddr);
+        AbstractBBCContext ctx = mockValidCtxWithPreReadyContracts(amAddr, sdpAddr, monitorAddr, ptcAddr);
         ethereumBBCService.startup(ctx);
         Assert.assertEquals(amAddr, ethereumBBCService.getBbcContext().getAuthMessageContract().getContractAddress());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ethereumBBCService.getBbcContext().getAuthMessageContract().getStatus());
         Assert.assertEquals(sdpAddr, ethereumBBCService.getBbcContext().getSdpContract().getContractAddress());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ethereumBBCService.getBbcContext().getSdpContract().getStatus());
+        Assert.assertEquals(monitorAddr, ethereumBBCService.getBbcContext().getMonitorContract().getContractAddress());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ethereumBBCService.getBbcContext().getMonitorContract().getStatus());
         Assert.assertEquals(ptcAddr, ethereumBBCService.getBbcContext().getPtcContract().getContractAddress());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ethereumBBCService.getBbcContext().getPtcContract().getStatus());
     }
@@ -468,18 +479,65 @@ public class EthereumBBCServiceTest {
     }
 
     @Test
-    public void testPtcContractAll() {
+    public void testSetupMonitorContract() {
         EthereumBBCService ethereumBBCService = new EthereumBBCService();
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
         ethereumBBCService.startup(mockValidCtx);
 
-        // set up sdp
+        // set up monitor
+        ethereumBBCService.setupMonitorContract();
+
+        // get context
+        AbstractBBCContext ctx = ethereumBBCService.getContext();
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getMonitorContract().getStatus());
+    }
+
+    @Test
+    public void testMonitorAndPtcContractAll() throws Exception {
+        EthereumBBCService ethereumBBCService = new EthereumBBCService();
+        // start up
+        AbstractBBCContext mockValidCtx = mockValidCtx();
+        ethereumBBCService.startup(mockValidCtx);
+
+        // set up sdp monitor and ptc
+        ethereumBBCService.setupSDPMessageContract();
+        ethereumBBCService.setupMonitorContract();
         ethereumBBCService.setupPTCContract();
 
         var ctx = ethereumBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctx.getPtcContract().getStatus());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getSdpContract().getStatus());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getMonitorContract().getStatus());
 
+        // init monitor
+        ethereumBBCService.setPtcHubInMonitorVerifier(ethereumBBCService.getBbcContext().getPtcContract().getContractAddress());
+
+        ethereumBBCService.setProtocolInMonitor(ctx.getSdpContract().getContractAddress());
+        String addr = Monitor.load(
+                ethereumBBCService.getBbcContext().getMonitorContract().getContractAddress(),
+                ethereumBBCService.getAcbEthClient().getWeb3j(),
+                ethereumBBCService.getAcbEthClient().getCredentials(),
+                new DefaultGasProvider()
+        ).getProtocol().send();
+        log.info("protocol in monitor: {}", addr);
+
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getMonitorContract().getStatus());
+
+        int monitorType = 2; // 2 denotes MONITOR_OPEN
+        ethereumBBCService.setMonitorControl(monitorType);
+        int monitorControl = Monitor.load(
+                ethereumBBCService.getBbcContext().getMonitorContract().getContractAddress(),
+                ethereumBBCService.getAcbEthClient().getWeb3j(),
+                ethereumBBCService.getAcbEthClient().getCredentials(),
+                new DefaultGasProvider()
+        ).getMonitorControl().send().intValue();
+        log.info("monitor control in monitor: {}", monitorControl);
+
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctx.getMonitorContract().getStatus());
+
+
+        // init ptc
         ethereumBBCService.updatePTCTrustRoot(ptcTrustRoot);
 
         var root = ethereumBBCService.getPTCTrustRoot(oid);
@@ -556,7 +614,8 @@ public class EthereumBBCServiceTest {
     }
 
     @Test
-    public void testSetAmContractAndLocalDomain() throws Exception {
+//    public void testSetAmContractAndLocalDomain() throws Exception {
+    public void testSetSDPContractAll() throws Exception {
         EthereumBBCService ethereumBBCService = new EthereumBBCService();
         // start up
         AbstractBBCContext mockValidCtx = mockValidCtx();
@@ -568,20 +627,19 @@ public class EthereumBBCServiceTest {
         // set up sdp
         ethereumBBCService.setupSDPMessageContract();
 
+        // set up monitor
+        ethereumBBCService.setupMonitorContract();
+
         // get context
         AbstractBBCContext ctx = ethereumBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getAuthMessageContract().getStatus());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getSdpContract().getStatus());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getMonitorContract().getStatus());
 
         // set am to sdp
         ethereumBBCService.setAmContract(ctx.getAuthMessageContract().getContractAddress());
 
-        String amAddr = SDPMsg.load(
-                ethereumBBCService.getBbcContext().getSdpContract().getContractAddress(),
-                ethereumBBCService.getAcbEthClient().getWeb3j(),
-                ethereumBBCService.getAcbEthClient().getCredentials(),
-                new DefaultGasProvider()
-        ).getAmAddress().send();
+        String amAddr = ethereumBBCService.getAcbEthClient().getAmContractFromSdp(ctx.getSdpContract().getContractAddress());
         log.info("amAddr: {}", amAddr);
 
         // check contract status
@@ -591,13 +649,31 @@ public class EthereumBBCServiceTest {
         // set the domain
         ethereumBBCService.setLocalDomain(CHAIN_DOMAIN);
 
-        byte[] rawDomain = SDPMsg.load(
+//        byte[] rawDomain = SDPMsg.load(
+//                ethereumBBCService.getBbcContext().getSdpContract().getContractAddress(),
+//                ethereumBBCService.getAcbEthClient().getWeb3j(),
+//                ethereumBBCService.getAcbEthClient().getCredentials(),
+//                new DefaultGasProvider()
+//        ).getLocalDomain().send();
+        byte[] rawDomain = ethereumBBCService.getAcbEthClient().getLocalDomainFromSdp(ctx.getSdpContract().getContractAddress());
+        log.info("domain: {}", HexUtil.encodeHexStr(rawDomain));
+
+//        String monitorAddr0 = ethereumBBCService.getAcbEthClient().getMonitorContractFromSdp(ctx.getSdpContract().getContractAddress());
+//        log.info("monitorAddr: {}", monitorAddr0);
+
+        // check contract status
+        ctx = ethereumBBCService.getContext();
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_DEPLOYED, ctx.getSdpContract().getStatus());
+
+        // set monitor to sdp
+        ethereumBBCService.setMonitorContract(ctx.getMonitorContract().getContractAddress());
+        String monitorAddr = SDPMsg.load(
                 ethereumBBCService.getBbcContext().getSdpContract().getContractAddress(),
                 ethereumBBCService.getAcbEthClient().getWeb3j(),
                 ethereumBBCService.getAcbEthClient().getCredentials(),
                 new DefaultGasProvider()
-        ).getLocalDomain().send();
-        log.info("domain: {}", HexUtil.encodeHexStr(rawDomain));
+        ).getMonitorAddress().send();
+        log.info("monitorAddr: {}", monitorAddr);
 
         // check contract status
         ctx = ethereumBBCService.getContext();
@@ -633,6 +709,124 @@ public class EthereumBBCServiceTest {
         CrossChainMessageReceipt crossChainMessageReceipt1 = ethereumBBCService.readCrossChainMessageReceipt(crossChainMessageReceipt.getTxhash());
 //        Assert.assertTrue(crossChainMessageReceipt1.isConfirmed());
         Assert.assertEquals(crossChainMessageReceipt.isSuccessful(), crossChainMessageReceipt1.isSuccessful());
+    }
+
+    @Test
+    public void testRelayMonitorOrder() throws Exception {
+        setupBbc();
+
+        // relay monitor order: add app contract to blacklist
+        log.info("[TEST-1]: relay monitor order to ADD app contract to BLACKLIST");
+
+        IMonitorOrder monitorOrder = MonitorOrderFactory.createMonitorOrder(
+                1,
+                "ethereum",
+                "testDomain1",
+                Long.parseLong("1000"+"0000000000000000000000000000", 2),
+                "testDomain1",
+                StrUtil.replace(appContract.getContractAddress(), "0x", "000000000000000000000000"),
+                "testDomain2",
+                StrUtil.replace(REMOTE_APP_CONTRACT, "0x", "000000000000000000000000"),
+                "this is a test monitor order",
+                "nothing in extra"
+        );
+
+        byte[] rawMonitorOrder = monitorOrder.encode();
+        byte[] rawProof = SignAlgoEnum.KECCAK256_WITH_SECP256K1.getSigner().sign(
+                NODE_PTC_PRIVATE_KEY,
+                rawMonitorOrder
+        );
+
+        CrossChainMessageReceipt crossChainMessageReceipt = ethereumBBCService.relayMonitorOrder(
+                COMMITTEE_ID,
+                SignAlgoEnum.KECCAK256_WITH_SECP256K1.getName(),
+                rawProof,
+                rawMonitorOrder
+        );
+
+//        CrossChainMessageReceipt crossChainMessageReceipt = ethereumBBCService.relayMonitorOrder(
+//                Long.parseLong("1000"+"0000000000000000000000000000", 2),
+//                "testDomain1",
+//                StrUtil.replace(appContract.getContractAddress(), "0x", "000000000000000000000000"),
+//                "testDomain2",
+//                StrUtil.replace(REMOTE_APP_CONTRACT, "0x", "000000000000000000000000"),
+//                "this is a test monitor order",
+//                "nothing in extra"
+//        );
+        Assert.assertTrue(crossChainMessageReceipt.isSuccessful());
+        waitForTxConfirmed(crossChainMessageReceipt.getTxhash(), ethereumBBCService.getAcbEthClient().getWeb3j());
+        CrossChainMessageReceipt crossChainMessageReceipt1 = ethereumBBCService.readCrossChainMessageReceipt(crossChainMessageReceipt.getTxhash());
+        Assert.assertEquals(crossChainMessageReceipt.isSuccessful(), crossChainMessageReceipt1.isSuccessful());
+
+        // test app contract: it should be unable to send message
+        try {
+            appContract.sendUnorderedMessage("remoteDomain", DigestUtil.sha256(REMOTE_APP_CONTRACT), "UnorderedCrossChainMessage".getBytes()).send();
+            Assert.fail("[appContract.sendUnorderedMessage]: expected transaction to revert, but it succeeded.");
+        } catch (Exception e) {
+            log.info("[appContract.sendUnorderedMessage]: reverted as expected: {}", e.getMessage());
+        }
+
+        // relay monitor order: remove app contract from blacklist
+        log.info("[TEST-2]: relay monitor order to REMOVE app contract to BLACKLIST");
+        IMonitorOrder monitorOrder2 = MonitorOrderFactory.createMonitorOrder(
+                1,
+                "ethereum",
+                "testDomain1",
+                Long.parseLong("1001"+"0000000000000000000000000000", 2),
+                "testDomain1",
+                StrUtil.replace(appContract.getContractAddress(), "0x", "000000000000000000000000"),
+                "testDomain2",
+                StrUtil.replace(REMOTE_APP_CONTRACT, "0x", "000000000000000000000000"),
+                "this is a test monitor order",
+                "nothing in extra"
+        );
+
+        byte[] rawMonitorOrder2 = monitorOrder2.encode();
+        byte[] rawProof2 = SignAlgoEnum.KECCAK256_WITH_SECP256K1.getSigner().sign(
+                NODE_PTC_PRIVATE_KEY,
+                rawMonitorOrder2
+        );
+
+        CrossChainMessageReceipt crossChainMessageReceipt2 = ethereumBBCService.relayMonitorOrder(
+                COMMITTEE_ID,
+                SignAlgoEnum.KECCAK256_WITH_SECP256K1.getName(),
+                rawProof2,
+                rawMonitorOrder2
+        );
+//        CrossChainMessageReceipt crossChainMessageReceipt2 = ethereumBBCService.relayMonitorOrder(
+//                Long.parseLong("1001"+"0000000000000000000000000000", 2),
+//                "testDomain1",
+//                StrUtil.replace(appContract.getContractAddress(), "0x", "000000000000000000000000"),
+//                "testDomain2",
+//                StrUtil.replace(REMOTE_APP_CONTRACT, "0x", "000000000000000000000000"),
+//                "this is a test monitor order",
+//                "nothing in extra"
+//        );
+        Assert.assertTrue(crossChainMessageReceipt2.isSuccessful());
+        waitForTxConfirmed(crossChainMessageReceipt2.getTxhash(), ethereumBBCService.getAcbEthClient().getWeb3j());
+        CrossChainMessageReceipt crossChainMessageReceipt3 = ethereumBBCService.readCrossChainMessageReceipt(crossChainMessageReceipt2.getTxhash());
+        Assert.assertEquals(crossChainMessageReceipt2.isSuccessful(), crossChainMessageReceipt3.isSuccessful());
+
+        // test app contract: it should be able to send message
+        try {
+            var receipt = appContract.sendUnorderedMessage("remoteDomain", DigestUtil.sha256(REMOTE_APP_CONTRACT), "UnorderedCrossChainMessage".getBytes()).send();
+            Assert.assertTrue(receipt.isStatusOK());
+        } catch (Exception e) {
+            log.error("[appContract.sendUnorderedMessage]: unexpected revert: {}", e.getMessage());
+            Assert.fail("[appContract.sendUnorderedMessage]: expected transaction to execute successfully, but it failed");
+        }
+    }
+
+
+    @Test
+    public void testQueryLatestBlockNumber() throws Exception {
+        EthereumBBCService ethereumBBCService = new EthereumBBCService();
+        // start up
+        AbstractBBCContext mockValidCtx = mockValidCtx();
+        ethereumBBCService.startup(mockValidCtx);
+
+        BigInteger l = ethereumBBCService.getAcbEthClient().queryLatestBlockNumber();
+        Assert.assertTrue(l.compareTo(BigInteger.ZERO) > 0);
     }
 
     @Test
@@ -684,7 +878,7 @@ public class EthereumBBCServiceTest {
         Assert.assertNotNull(provableData);
         Assert.assertEquals(msgOnHeight, provableData.getHeightVal());
         Assert.assertEquals(receipt.getTransactionHash(), Numeric.toHexString(provableData.getTxHash()));
-        Assert.assertEquals(receipt.getBlockHash(), Numeric.toHexString(provableData.getBlockHash()));
+       Assert.assertEquals(receipt.getBlockHash(), Numeric.toHexString(provableData.getBlockHash()));
         var proofObj = EthReceiptProof.decodeFromJson(new String(provableData.getProof()));
         Assert.assertNotNull(proofObj);
         Assert.assertNotNull(proofObj.getEthTransactionReceipt());
@@ -785,6 +979,9 @@ public class EthereumBBCServiceTest {
         // set up sdp
         ethereumBBCService.setupSDPMessageContract();
 
+        // set up monitor
+        ethereumBBCService.setupMonitorContract();
+
         ethereumBBCService.setupPTCContract();
 
         // set protocol to am (sdp type: 0)
@@ -798,6 +995,19 @@ public class EthereumBBCServiceTest {
         // set local domain to sdp
         ethereumBBCService.setLocalDomain(CHAIN_DOMAIN);
 
+        // set monitor to sdp
+        ethereumBBCService.setMonitorContract(mockValidCtx.getMonitorContract().getContractAddress());
+
+        // set sdp to monitor
+        ethereumBBCService.setProtocolInMonitor(mockValidCtx.getSdpContract().getContractAddress());
+
+        // set monitorControl to monitor
+        ethereumBBCService.setMonitorControl(2);
+
+        // set ptc hub to monitor verifier
+        ethereumBBCService.setPtcHubInMonitorVerifier(mockValidCtx.getPtcContract().getContractAddress());
+
+        // set ptc tp am
         ethereumBBCService.setPtcContract(mockValidCtx.getPtcContract().getContractAddress());
 
         ethereumBBCService.updatePTCTrustRoot(ptcTrustRoot);
@@ -808,6 +1018,7 @@ public class EthereumBBCServiceTest {
         AbstractBBCContext ctxCheck = ethereumBBCService.getContext();
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctxCheck.getAuthMessageContract().getStatus());
         Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctxCheck.getSdpContract().getStatus());
+        Assert.assertEquals(ContractStatusEnum.CONTRACT_READY, ctxCheck.getMonitorContract().getStatus());
 
         TransactionReceipt receipt = appContract.setProtocol(ethereumBBCService.getBbcContext().getSdpContract().getContractAddress()).send();
         if (receipt.isStatusOK()) {
@@ -818,6 +1029,17 @@ public class EthereumBBCServiceTest {
             throw new Exception(String.format("failed to set protocol(%s) to app contract(%s)",
                     appContract.getContractAddress(),
                     ethereumBBCService.getBbcContext().getSdpContract().getContractAddress()));
+        }
+
+        TransactionReceipt receipt1 = appContract.setMonitorContract(ethereumBBCService.getBbcContext().getMonitorContract().getContractAddress()).send();
+        if (receipt1.isStatusOK()) {
+            log.info("set monitor contract({}) to app contract({})",
+                    ethereumBBCService.getBbcContext().getMonitorContract().getContractAddress(),
+                    appContract.getContractAddress());
+        } else {
+            throw new Exception(String.format("failed to set monitor contract(%s) to app contract(%s)",
+                    ethereumBBCService.getBbcContext().getMonitorContract().getContractAddress(),
+                    appContract.getContractAddress()));
         }
 
         setupBBC = true;
@@ -861,13 +1083,14 @@ public class EthereumBBCServiceTest {
         return mockCtx;
     }
 
-    private AbstractBBCContext mockValidCtxWithPreDeployedContracts(String amAddr, String sdpAddr, String ptcAddr) {
+    private AbstractBBCContext mockValidCtxWithPreDeployedContracts(String amAddr, String sdpAddr, String monitorAddr, String ptcAddr) {
         EthereumConfig mockConf = new EthereumConfig();
         mockConf.setUrl(VALID_URL);
         mockConf.setBeaconApiUrl(VALID_BEACON_URL);
         mockConf.setPrivateKey(BBC_ETH_PRIVATE_KEY_2);
         mockConf.setAmContractAddressDeployed(amAddr);
         mockConf.setSdpContractAddressDeployed(sdpAddr);
+        mockConf.setMonitorContractAddressDeployed(monitorAddr);
         mockConf.setPtcHubContractAddressDeployed(ptcAddr);
         mockConf.setMsgScanPolicy(scanPolicy);
         mockConf.setGasLimitPolicy(gasLimitPolicy);
@@ -889,13 +1112,14 @@ public class EthereumBBCServiceTest {
         return mockCtx;
     }
 
-    private AbstractBBCContext mockValidCtxWithPreReadyContracts(String amAddr, String sdpAddr, String ptcAddr) {
+    private AbstractBBCContext mockValidCtxWithPreReadyContracts(String amAddr, String sdpAddr, String monitorAddr, String ptcAddr) {
         EthereumConfig mockConf = new EthereumConfig();
         mockConf.setUrl(VALID_URL);
         mockConf.setBeaconApiUrl(VALID_BEACON_URL);
         mockConf.setPrivateKey(BBC_ETH_PRIVATE_KEY_3);
         mockConf.setAmContractAddressDeployed(amAddr);
         mockConf.setSdpContractAddressDeployed(sdpAddr);
+        mockConf.setMonitorContractAddressDeployed(monitorAddr);
         mockConf.setPtcHubContractAddressDeployed(ptcAddr);
         mockConf.setMsgScanPolicy(scanPolicy);
         mockConf.setGasLimitPolicy(gasLimitPolicy);
@@ -924,6 +1148,11 @@ public class EthereumBBCServiceTest {
         sdpContract.setContractAddress(sdpAddr);
         sdpContract.setStatus(ContractStatusEnum.CONTRACT_READY);
         mockCtx.setSdpContract(sdpContract);
+
+        MonitorContract monitorContract = new MonitorContract();
+        monitorContract.setContractAddress(monitorAddr);
+        monitorContract.setStatus(ContractStatusEnum.CONTRACT_READY);
+        mockCtx.setMonitorContract(monitorContract);
 
         return mockCtx;
     }
@@ -954,13 +1183,20 @@ public class EthereumBBCServiceTest {
     }
 
     private byte[] getRawMsgFromRelayer(String receiverAddr) throws IOException {
+        // need to replace "awesome antchain-bridge" with monitor message
+        IMonitorMessage monitorMessage = MonitorMessageFactory.createMonitorMessage(
+                1,
+                2,
+                "this is a monitorMsg",
+                "awesome antchain-bridge".getBytes()
+        );
         ISDPMessage sdpMessage = SDPMessageFactory.createSDPMessage(
                 1,
                 new byte[32],
                 crossChainLane.getReceiverDomain().getDomain(),
                 Numeric.hexStringToByteArray(StrUtil.replace(receiverAddr, "0x", "000000000000000000000000")),
                 -1,
-                "awesome antchain-bridge".getBytes()
+                monitorMessage.encode()
         );
         IAuthMessage am = AuthMessageFactory.createAuthMessage(
                 1,
@@ -983,7 +1219,14 @@ public class EthereumBBCServiceTest {
                         thirdPartyProof.getEncodedToSign()
                 )).build();
         CommitteeNodeProof node2Proof = CommitteeNodeProof.builder()
-                .nodeId("node2")
+                .nodeId("monitor-node")
+                .signAlgo(SignAlgoEnum.KECCAK256_WITH_SECP256K1)
+                .signature(SignAlgoEnum.KECCAK256_WITH_SECP256K1.getSigner().sign(
+                        NODE_PTC_PRIVATE_KEY,
+                        thirdPartyProof.getEncodedToSign()
+                )).build();
+        CommitteeNodeProof node3Proof = CommitteeNodeProof.builder()
+                .nodeId("node3")
                 .signAlgo(SignAlgoEnum.KECCAK256_WITH_SECP256K1)
                 .signature(SignAlgoEnum.KECCAK256_WITH_SECP256K1.getSigner().sign(
                         NODE_PTC_PRIVATE_KEY,
@@ -992,7 +1235,7 @@ public class EthereumBBCServiceTest {
 
         CommitteeEndorseProof endorseProof = new CommitteeEndorseProof();
         endorseProof.setCommitteeId(COMMITTEE_ID);
-        endorseProof.setSigs(ListUtil.toList(node1Proof, node2Proof));
+        endorseProof.setSigs(ListUtil.toList(node1Proof, node2Proof, node3Proof));
 
         thirdPartyProof.setRawProof(endorseProof.encode());
 

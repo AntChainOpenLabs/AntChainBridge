@@ -26,10 +26,7 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSON;
 import com.alipay.antchain.bridge.commons.bbc.AbstractBBCContext;
-import com.alipay.antchain.bridge.commons.bbc.syscontract.AuthMessageContract;
-import com.alipay.antchain.bridge.commons.bbc.syscontract.ContractStatusEnum;
-import com.alipay.antchain.bridge.commons.bbc.syscontract.PTCContract;
-import com.alipay.antchain.bridge.commons.bbc.syscontract.SDPContract;
+import com.alipay.antchain.bridge.commons.bbc.syscontract.*;
 import com.alipay.antchain.bridge.commons.bcdns.AbstractCrossChainCertificate;
 import com.alipay.antchain.bridge.commons.bcdns.CrossChainCertificateTypeEnum;
 import com.alipay.antchain.bridge.commons.bcdns.utils.CrossChainCertificateUtil;
@@ -102,6 +99,7 @@ public class EthereumBBCService extends AbstractBBCService {
             authMessageContract.setContractAddress(this.config.getAmContractAddressDeployed());
             authMessageContract.setStatus(ContractStatusEnum.CONTRACT_DEPLOYED);
             this.bbcContext.setAuthMessageContract(authMessageContract);
+            getBBCLogger().info("set the pre-deployed am contracts into context: {}: ", this.config.getAmContractAddressDeployed());
         }
 
         if (ObjectUtil.isNull(abstractBBCContext.getSdpContract())
@@ -110,6 +108,16 @@ public class EthereumBBCService extends AbstractBBCService {
             sdpContract.setContractAddress(this.config.getSdpContractAddressDeployed());
             sdpContract.setStatus(ContractStatusEnum.CONTRACT_DEPLOYED);
             this.bbcContext.setSdpContract(sdpContract);
+            getBBCLogger().info("set the pre-deployed sdp contracts into context: {}: ", this.config.getSdpContractAddressDeployed());
+        }
+
+        if (ObjectUtil.isNull(abstractBBCContext.getMonitorContract())
+                && StrUtil.isNotEmpty(this.config.getMonitorContractAddressDeployed())) {
+            MonitorContract monitorContract = new MonitorContract();
+            monitorContract.setContractAddress(this.config.getMonitorContractAddressDeployed());
+            monitorContract.setStatus(ContractStatusEnum.CONTRACT_DEPLOYED);
+            this.bbcContext.setMonitorContract(monitorContract);
+            getBBCLogger().info("set the pre-deployed monitor contracts into context: {}: ", this.config.getMonitorContractAddressDeployed());
         }
 
         if (ObjectUtil.isNull(abstractBBCContext.getPtcContract())
@@ -118,6 +126,7 @@ public class EthereumBBCService extends AbstractBBCService {
             ptcContract.setContractAddress(this.config.getPtcHubContractAddressDeployed());
             ptcContract.setStatus(ContractStatusEnum.CONTRACT_READY);
             this.bbcContext.setPtcContract(ptcContract);
+            getBBCLogger().info("set the pre-deployed ptc contracts into context: {}: ", this.config.getPtcHubContractAddressDeployed());
         }
 
         if (ObjectUtil.isEmpty(this.config.getProxyAdmin()) && this.config.isUpgradableContracts()) {
@@ -140,11 +149,13 @@ public class EthereumBBCService extends AbstractBBCService {
             throw new RuntimeException("empty bbc context");
         }
 
-        getBBCLogger().debug("ETH BBCService context (amAddr: {}, amStatus: {}, sdpAddr: {}, sdpStatus: {})",
+        getBBCLogger().debug("ETH BBCService context (amAddr: {}, amStatus: {}, sdpAddr: {}, sdpStatus: {}, monitorAddr: {}, monitorStatus: {})",
                 this.bbcContext.getAuthMessageContract() != null ? this.bbcContext.getAuthMessageContract().getContractAddress() : "",
                 this.bbcContext.getAuthMessageContract() != null ? this.bbcContext.getAuthMessageContract().getStatus() : "",
                 this.bbcContext.getSdpContract() != null ? this.bbcContext.getSdpContract().getContractAddress() : "",
-                this.bbcContext.getSdpContract() != null ? this.bbcContext.getSdpContract().getStatus() : ""
+                this.bbcContext.getSdpContract() != null ? this.bbcContext.getSdpContract().getStatus() : "",
+                this.bbcContext.getMonitorContract() != null ? this.bbcContext.getMonitorContract().getContractAddress() : "",
+                this.bbcContext.getMonitorContract() != null ? this.bbcContext.getMonitorContract().getStatus() : ""
         );
 
         this.bbcContext.setConfForBlockchainClient(this.config.toJsonString().getBytes());
@@ -294,6 +305,32 @@ public class EthereumBBCService extends AbstractBBCService {
     }
 
     @Override
+    public void setupMonitorContract() {
+        // 1. check context
+        if (ObjectUtil.isNull(this.bbcContext)) {
+            throw new RuntimeException("empty bbc context");
+        }
+        if (this.config.isUpgradableContracts() && StrUtil.isEmpty(this.config.getProxyAdmin())) {
+            throw new RuntimeException("empty proxy admin");
+        }
+        if (ObjectUtil.isNotNull(this.bbcContext.getMonitorContract())
+                && StrUtil.isNotEmpty(this.bbcContext.getMonitorContract().getContractAddress())) {
+            // If the contract has been pre-deployed and the contract address is configured in the configuration file,
+            // there is no need to redeploy.
+            return;
+        }
+
+        // 2. deploy contract
+        var monitorContractAddr = acbEthClient.deployMonitorContract(acbEthClient.deployMonitorVerifierContract());
+
+        MonitorContract monitorContract = new MonitorContract();
+        monitorContract.setContractAddress(monitorContractAddr);
+        monitorContract.setStatus(ContractStatusEnum.CONTRACT_DEPLOYED);
+        bbcContext.setMonitorContract(monitorContract);
+        getBBCLogger().info("setup monitor contract successful: {}", monitorContractAddr);
+    }
+
+    @Override
     public long querySDPMessageSeq(String senderDomain, String senderID, String receiverDomain, String receiverID) {
         // 1. check context
         if (ObjectUtil.isNull(this.bbcContext)) {
@@ -347,7 +384,38 @@ public class EthereumBBCService extends AbstractBBCService {
         // 4. update sdp contract status
         try {
             if (!StrUtil.isEmpty(acbEthClient.getAmContractFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
-                    && !isByteArrayZero(acbEthClient.getLocalDomainFromSdp(this.bbcContext.getSdpContract().getContractAddress()))) {
+                    && !isByteArrayZero(acbEthClient.getLocalDomainFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
+                    && !"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getMonitorContractFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
+            ) {
+                this.bbcContext.getSdpContract().setStatus(ContractStatusEnum.CONTRACT_READY);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to update sdp contract status (address: %s)",
+                            this.bbcContext.getSdpContract().getContractAddress()
+                    ), e);
+        }
+    }
+
+    @Override
+    public void setMonitorContract(String contractAddress) {
+        // 1. check context
+        if (ObjectUtil.isNull(this.bbcContext)) {
+            throw new RuntimeException("empty bbc context");
+        }
+        if (ObjectUtil.isNull(this.bbcContext.getSdpContract())) {
+            throw new RuntimeException("empty sdp contract in bbc context");
+        }
+
+        acbEthClient.setMonitorContractToSdp(this.bbcContext.getSdpContract().getContractAddress(), contractAddress);
+
+        // 4. update sdp contract status
+        try {
+            if (!StrUtil.isEmpty(acbEthClient.getAmContractFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
+                    && !isByteArrayZero(acbEthClient.getLocalDomainFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
+                    && !"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getMonitorContractFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
+            ) {
                 this.bbcContext.getSdpContract().setStatus(ContractStatusEnum.CONTRACT_READY);
             }
         } catch (Exception e) {
@@ -374,7 +442,9 @@ public class EthereumBBCService extends AbstractBBCService {
         // 4. update sdp contract status
         try {
             if (!StrUtil.isEmpty(acbEthClient.getAmContractFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
-                    && !isByteArrayZero(acbEthClient.getLocalDomainFromSdp(this.bbcContext.getSdpContract().getContractAddress()))) {
+                    && !isByteArrayZero(acbEthClient.getLocalDomainFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
+                    && !"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getMonitorContractFromSdp(this.bbcContext.getSdpContract().getContractAddress()))
+            ) {
                 this.bbcContext.getSdpContract().setStatus(ContractStatusEnum.CONTRACT_READY);
             }
         } catch (Exception e) {
@@ -385,6 +455,120 @@ public class EthereumBBCService extends AbstractBBCService {
                     ), e);
         }
     }
+
+    @Override
+    public void setProtocolInMonitor(String protocolAddress) {
+        // 1. check context
+        if (ObjectUtil.isNull(this.bbcContext)) {
+            throw new RuntimeException("empty bbc context");
+        }
+        if (ObjectUtil.isNull(this.bbcContext.getMonitorContract())) {
+            throw new RuntimeException("empty monitor contract in bbc context");
+        }
+
+        acbEthClient.setProtocolToMonitor(this.bbcContext.getMonitorContract().getContractAddress(), protocolAddress);
+
+        // 4. update monitor contract status
+        try {
+            String monitorVerifier = acbEthClient.getMonitorVerifierFromMonitor(this.bbcContext.getMonitorContract().getContractAddress());
+            if (!"0x0000000000000000000000000000000000000000".equalsIgnoreCase(monitorVerifier)
+                    && !"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getPtcHubFromMonitorVerifier(monitorVerifier))) {
+                if (!"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getProtocolFromMonitor(this.bbcContext.getMonitorContract().getContractAddress()))
+                        && acbEthClient.getMonitorControlFromMonitor(this.bbcContext.getMonitorContract().getContractAddress()) != 0) {
+                    this.bbcContext.getMonitorContract().setStatus(ContractStatusEnum.CONTRACT_READY);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to update monitor contract status (address: %s)",
+                            this.bbcContext.getMonitorContract().getContractAddress()
+                    ), e);
+        }
+    }
+
+    @Override
+    public void setMonitorControl(int monitorType) {
+        // 1. check context
+        if (ObjectUtil.isNull(this.bbcContext)) {
+            throw new RuntimeException("empty bbc context");
+        }
+        if (ObjectUtil.isNull(this.bbcContext.getMonitorContract())) {
+            throw new RuntimeException("empty monitor contract in bbc context");
+        }
+
+        acbEthClient.setMonitorControl(this.bbcContext.getMonitorContract().getContractAddress(), monitorType);
+
+        // 4. update monitor contract status
+        try {
+            String monitorVerifier = acbEthClient.getMonitorVerifierFromMonitor(this.bbcContext.getMonitorContract().getContractAddress());
+            if (!"0x0000000000000000000000000000000000000000".equalsIgnoreCase(monitorVerifier)
+                    && !"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getPtcHubFromMonitorVerifier(monitorVerifier))) {
+                if (!"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getProtocolFromMonitor(this.bbcContext.getMonitorContract().getContractAddress()))
+                        && acbEthClient.getMonitorControlFromMonitor(this.bbcContext.getMonitorContract().getContractAddress()) != 0) {
+                    this.bbcContext.getMonitorContract().setStatus(ContractStatusEnum.CONTRACT_READY);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to update monitor contract status (address: %s)",
+                            this.bbcContext.getMonitorContract().getContractAddress()
+                    ), e);
+        }
+    }
+
+    @Override
+    public void setPtcHubInMonitorVerifier(String contractAddress) {
+        // 1. check context
+        if (ObjectUtil.isNull(this.bbcContext)) {
+            throw new RuntimeException("empty bbc context");
+        }
+        if (ObjectUtil.isNull(this.bbcContext.getMonitorContract())) {
+            throw new RuntimeException("empty monitor contract in bbc context");
+        }
+        if (ObjectUtil.isNull(this.bbcContext.getPtcContract())) {
+            throw new RuntimeException("empty PtcHub contract in bbc context");
+        }
+        String monitorVerifier = acbEthClient.getMonitorVerifierFromMonitor(this.bbcContext.getMonitorContract().getContractAddress());
+        if ("0x0000000000000000000000000000000000000000".equalsIgnoreCase(monitorVerifier)) {
+            throw new RuntimeException("not set monitor verifier contract in monitor contract yet");
+        }
+
+        acbEthClient.setPtcHubToMonitorVerifier(monitorVerifier, contractAddress);
+
+        // 4. update monitor contract status
+        try {
+            if (!"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getPtcHubFromMonitorVerifier(monitorVerifier)) &&
+                    !"0x0000000000000000000000000000000000000000".equalsIgnoreCase(acbEthClient.getProtocolFromMonitor(this.bbcContext.getMonitorContract().getContractAddress()))
+                    && acbEthClient.getMonitorControlFromMonitor(this.bbcContext.getMonitorContract().getContractAddress()) != 0 ) {
+                this.bbcContext.getMonitorContract().setStatus(ContractStatusEnum.CONTRACT_READY);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to update monitor contract status (address: %s)",
+                            this.bbcContext.getMonitorContract().getContractAddress()
+                    ), e);
+        }
+
+    }
+
+    @Override
+    public CrossChainMessageReceipt relayMonitorOrder(String committeeId, String signAlgo, byte[] rawProof, byte[] rawMonitorOrder) {
+        // 1. check context
+        if (ObjectUtil.isNull(this.bbcContext)) {
+            throw new RuntimeException("empty bbc context");
+        }
+        if (ObjectUtil.isNull(this.bbcContext.getMonitorContract())) {
+            throw new RuntimeException("empty monitor contract in bbc context");
+        }
+
+        getBBCLogger().debug("relay MonitorOrder to {} ", this.bbcContext.getMonitorContract().getContractAddress());
+
+        return acbEthClient.relayMonitorOrderToMonitor(this.bbcContext.getMonitorContract().getContractAddress(), committeeId, signAlgo, rawProof, rawMonitorOrder);
+    }
+
 
     @Override
     public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage) {
@@ -503,6 +687,7 @@ public class EthereumBBCService extends AbstractBBCService {
         return acbEthClient.hasPTCVerifyAnchor(this.bbcContext.getPtcContract().getContractAddress(), ptcOwnerOid, version);
     }
 
+    // in this version, ptc contract needs to be deployed after monitor contract, since monitor verifier is necessary for the init
     @Override
     public void setupPTCContract() {
         // 1. check context
@@ -529,7 +714,8 @@ public class EthereumBBCService extends AbstractBBCService {
         }
 
         // 2. deploy contract
-        String ptcHubContractAddr = acbEthClient.deployPtcHubContract(bcdnsRootCert, acbEthClient.deployCommitteeVerifierContract());
+        String ptcHubContractAddr = acbEthClient.deployPtcHubContract(bcdnsRootCert, acbEthClient.deployCommitteeVerifierContract(),
+                acbEthClient.getMonitorVerifierFromMonitor(this.bbcContext.getMonitorContract().getContractAddress()));
 
         PTCContract ptcContract = new PTCContract();
         ptcContract.setContractAddress(ptcHubContractAddr);

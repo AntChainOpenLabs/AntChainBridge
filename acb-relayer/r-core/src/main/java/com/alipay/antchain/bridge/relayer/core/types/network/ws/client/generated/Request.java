@@ -7,9 +7,9 @@ import javax.xml.bind.annotation.XmlType;
 
 
 /**
- * <p>request complex type的 Java 类。
+ * <p>Java class for request complex type.
  * 
- * <p>以下模式片段指定包含在此类中的预期内容。
+ * <p>The following schema fragment specifies the expected content contained within this class.
  * 
  * <pre>
  * &lt;complexType name="request"&gt;
@@ -34,7 +34,7 @@ public class Request {
     protected String relayerRequest;
 
     /**
-     * 获取relayerRequest属性的值。
+     * Gets the value of the relayerRequest property.
      * 
      * @return
      *     possible object is
@@ -46,7 +46,7 @@ public class Request {
     }
 
     /**
-     * 设置relayerRequest属性的值。
+     * Sets the value of the relayerRequest property.
      * 
      * @param value
      *     allowed object is

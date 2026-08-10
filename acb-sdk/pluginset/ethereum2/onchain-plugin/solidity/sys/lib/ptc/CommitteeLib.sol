@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 
 import "./PtcLib.sol";
+import "../../interfaces/IMonitorVerifier.sol";
 import "../../@openzeppelin/contracts/utils/Strings.sol";
 
 // tags for CommitteeEndorseRoot
@@ -94,6 +95,8 @@ library CommitteeLib {
 
     event DoVeriyTpBta(CrossChainLane laneKey, string committeeId, string nodeId, bool result);
     event DoVeriyTpProof(CrossChainLane laneKey, string committeeId, string nodeId, bool result);
+    event DoVerifyTpProofFromMonitorNode(CrossChainLane laneKey, string committeeId, string nodeId, bool result);
+    event DoVerifyMonitorOrder(string committeeId, string nodeId, bool res);
 
     using TLVUtils for TLVPacket;
     using TLVUtils for TLVItem;
@@ -162,7 +165,7 @@ library CommitteeLib {
         return 3 * correct > 2 * cva.anchors.length;
     }
 
-    function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof) internal returns (bool) {
+    function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof , address monitorPtcAddr) internal returns (bool) {
         CommitteeEndorseRoot memory cer = decodeCommitteeEndorseRootFrom(tpBta.endorseRoot);
         CommitteeEndorseProof memory ceProof = decodeCommitteeEndorseProofFrom(tpProof.rawProof);
 
@@ -173,9 +176,17 @@ library CommitteeLib {
         for (uint i = 0; i < cer.endorsers.length; i++)
         {
             NodeEndorseInfo memory info = cer.endorsers[i];
+            bool isMonitorNode = false;
             bool res = false;
             for (uint j = 0; j < ceProof.sigs.length; j++) {
                 if (info.nodeId.equal(ceProof.sigs[j].nodeId)) {
+                    // if it is monitor node proof, trans it to MonitorPTC
+                    if (checkMonitorNode(info.nodeId)) {
+                        isMonitorNode = true;
+                        IMonitorVerifier(monitorPtcAddr).receiveMonitorNodeProofMessage(tpBta.crossChainLane, cer.committeeId, ceProof.sigs[j], encodedToSign);
+                        res = true;
+                        break;
+                    }
                     res = AcbCommons.verifySig(
                         ceProof.sigs[j].signAlgo,
                         info.publicKey.getRawPublicKey(),
@@ -188,14 +199,68 @@ library CommitteeLib {
                     }
                 }
             }
-
-            emit DoVeriyTpProof(tpBta.crossChainLane, cer.committeeId, info.nodeId, res);
+            if (!isMonitorNode) {
+                emit DoVeriyTpProof(tpBta.crossChainLane, cer.committeeId, info.nodeId, res);
+            }
             if (!res && info.required) {
                 return false;
             }
         }
 
         return cer.policy.threshold.check(optinalCorrect);
+    }
+
+    function checkMonitorNode(string memory nodeId) internal pure returns (bool) {
+        bytes memory prefix = bytes("monitor");
+        bytes memory nodeIdBytes = bytes(nodeId);
+
+        if (nodeIdBytes.length < prefix.length) {
+            return false;
+        }
+
+        for (uint i = 0; i < prefix.length; i++) {
+            if (nodeIdBytes[i] != prefix[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function verifyTpProofFromMonitorNode(
+        CrossChainLane memory crossChainLane,
+        string memory committeeId,
+        NodeEndorseInfo memory monitorNodeEndorseInfo,
+        CommitteeNodeProof memory monitorNodeProof,
+        bytes memory encodedToSign
+    ) internal returns (bool) {
+        bool res = false;
+        res = AcbCommons.verifySig(
+            monitorNodeProof.signAlgo,
+            monitorNodeEndorseInfo.publicKey.getRawPublicKey(),
+            encodedToSign,
+            monitorNodeProof.signature
+        );
+        emit DoVerifyTpProofFromMonitorNode(crossChainLane, committeeId, monitorNodeEndorseInfo.nodeId, res);
+        return res;
+    }
+
+    function verifyMonitorOrder(
+        string memory committeeId,
+        NodeEndorseInfo memory monitorNodeEndorseInfo,
+        string memory signAlgo,
+        bytes memory rawProof,
+        bytes memory rawMonitorOrder
+    ) internal returns (bool) {
+        bool res = false;
+        res = AcbCommons.verifySig(
+            signAlgo,
+            monitorNodeEndorseInfo.publicKey.getRawPublicKey(),
+            rawMonitorOrder,
+            rawProof
+        );
+        emit DoVerifyMonitorOrder(committeeId, monitorNodeEndorseInfo.nodeId, res);
+        return res;
     }
 
     function getRawPublicKey(

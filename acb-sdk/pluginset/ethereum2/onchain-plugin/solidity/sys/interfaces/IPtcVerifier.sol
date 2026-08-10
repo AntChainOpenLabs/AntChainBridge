@@ -8,7 +8,7 @@ interface IPtcVerifier {
 
     function verifyTpBta(PTCVerifyAnchor calldata va, TpBta calldata tpBta) external returns (bool);
 
-    function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof) external returns (bool);
+    function verifyTpProof(TpBta memory tpBta, ThirdPartyProof memory tpProof, address monitorPtcAddr) external returns (bool);
 
     function myPtcType() external returns (PTCTypeEnum);
 }

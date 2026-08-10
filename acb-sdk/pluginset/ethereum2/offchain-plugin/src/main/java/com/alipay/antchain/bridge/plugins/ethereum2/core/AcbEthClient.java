@@ -256,6 +256,190 @@ public class AcbEthClient {
         return sdpMsg.getContractAddress();
     }
 
+    public String deployMonitorContract(String monitorVerifierContractAddress) {
+        Monitor monitor;
+        try {
+            monitor = Monitor.deploy(
+                    web3j,
+                    rawTransactionManager,
+                    new AcbGasProvider(
+                            this.contractGasPriceProvider,
+                            createDeployGasLimitProvider(Monitor.BINARY)
+                    )
+            ).send();
+        } catch (Exception e) {
+            throw new RuntimeException("failed to deploy monitor", e);
+        }
+
+        String monitorContractAddress = monitor.getContractAddress();
+
+        if (this.config.isUpgradableContracts()) {
+            TransparentUpgradeableProxy proxy;
+            try {
+                proxy = TransparentUpgradeableProxy.deploy(
+                        web3j,
+                        rawTransactionManager,
+                        new AcbGasProvider(
+                                this.contractGasPriceProvider,
+                                createDeployGasLimitProvider(
+                                        TransparentUpgradeableProxy.BINARY +
+                                                FunctionEncoder.encodeConstructor(ListUtil.toList(
+                                                        new org.web3j.abi.datatypes.Address(monitor.getContractAddress()),
+                                                        new org.web3j.abi.datatypes.Address(this.config.getProxyAdmin()),
+                                                        new DynamicBytes(HexUtil.decodeHex("e1c7392a"))
+                                                ))
+                                )
+                        ),
+                        BigInteger.ZERO,
+                        monitor.getContractAddress(),
+                        this.config.getProxyAdmin(),
+                        HexUtil.decodeHex("e1c7392a")
+                ).send();
+            } catch (Exception e) {
+                throw new RuntimeException("failed to deploy monitor contract", e);
+            }
+            getBbcLogger().info("deploy proxy contract for monitor: {}", proxy.getContractAddress());
+            monitorContractAddress = proxy.getContractAddress();
+        }
+
+        // set monitor verifier to monitor
+        monitor = Monitor.load(
+                monitorContractAddress,
+                web3j,
+                rawTransactionManager,
+                new AcbGasProvider(
+                        this.contractGasPriceProvider,
+                        createEthCallGasLimitProvider(
+                                monitorContractAddress,
+                                new Function(
+                                        Monitor.FUNC_SETMONITORVERIFIER,
+                                        ListUtil.toList(new org.web3j.abi.datatypes.Address(monitorVerifierContractAddress)),
+                                        ListUtil.empty()
+                                )
+                        )
+                )
+        );
+
+        try {
+            TransactionReceipt receipt = monitor.setMonitorVerifier(monitorVerifierContractAddress).send();
+            if (!receipt.isStatusOK()) {
+                throw new RuntimeException(
+                        StrUtil.format(
+                                "transaction {} shows failed when set monitor verifier {} to monitor {}: {}",
+                                receipt.getTransactionHash(), monitorVerifierContractAddress, monitorContractAddress, receipt.getRevertReason()
+                        )
+                );
+            }
+            getBbcLogger().info(
+                    "set monitor verifier {} to monitor {} by tx {} ", monitorVerifierContractAddress, monitorContractAddress, receipt.getTransactionHash()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "unexpected failure when setting monitor verifier %s to monitor %s",
+                            monitorVerifierContractAddress, monitorContractAddress
+                    ), e
+            );
+        }
+
+        return monitorContractAddress;
+    }
+
+    public String deployMonitorVerifierContract() {
+        MonitorVerifier monitorVerifier;
+        try {
+            monitorVerifier = MonitorVerifier.deploy(
+                    web3j,
+                    rawTransactionManager,
+                    new AcbGasProvider(
+                            this.contractGasPriceProvider,
+                            createDeployGasLimitProvider(MonitorVerifier.BINARY)
+                    )
+            ).send();
+        } catch (Exception e) {
+            throw new RuntimeException("failed to deploy MonitorVerifier", e);
+        }
+
+        if (this.config.isUpgradableContracts()) {
+            TransparentUpgradeableProxy proxy;
+            try {
+                proxy = TransparentUpgradeableProxy.deploy(
+                        web3j,
+                        rawTransactionManager,
+                        new AcbGasProvider(
+                                this.contractGasPriceProvider,
+                                createDeployGasLimitProvider(
+                                        TransparentUpgradeableProxy.BINARY +
+                                                FunctionEncoder.encodeConstructor(ListUtil.toList(
+                                                        new org.web3j.abi.datatypes.Address(monitorVerifier.getContractAddress()),
+                                                        new org.web3j.abi.datatypes.Address(this.config.getProxyAdmin()),
+                                                        new DynamicBytes(HexUtil.decodeHex("e1c7392a"))
+                                                ))
+                                )
+                        ),
+                        BigInteger.ZERO,
+                        monitorVerifier.getContractAddress(),
+                        this.config.getProxyAdmin(),
+                        HexUtil.decodeHex("e1c7392a")
+                ).send();
+            } catch (Exception e) {
+                throw new RuntimeException("failed to deploy monitorVerifier contract", e);
+            }
+            getBbcLogger().info("deploy proxy contract for monitorVerifier: {}", proxy.getContractAddress());
+            return proxy.getContractAddress();
+        }
+
+        return monitorVerifier.getContractAddress();
+    }
+
+    @SneakyThrows
+    public String getMonitorVerifierFromMonitor(String monitorContractAddress) {
+        Monitor monitor = Monitor.load(monitorContractAddress, web3j, rawTransactionManager, new DefaultGasProvider());
+        return monitor.getMonitorVerifier().send();
+    }
+
+    public void setPtcHubToMonitorVerifier(String monitorVerifierContractAddress, String ptcHubContractAddress) {
+        // 2. load monitor verifier contract
+        MonitorVerifier monitorVerifier = MonitorVerifier.load(
+                monitorVerifierContractAddress,
+                this.web3j,
+                this.rawTransactionManager,
+                new AcbGasProvider(
+                        this.contractGasPriceProvider,
+                        createEthCallGasLimitProvider(
+                                monitorVerifierContractAddress,
+                                new Function(
+                                        MonitorVerifier.FUNC_SETPTCHUBADDRESS,
+                                        ListUtil.toList(new org.web3j.abi.datatypes.Address(ptcHubContractAddress)), // inputs
+                                        Collections.emptyList()
+                                )
+                        )
+                )
+        );
+
+        // 3. set ptc hub to monitor verifier
+        try {
+            var receipt = monitorVerifier.setPtcHubAddress(ptcHubContractAddress).send();
+            getBbcLogger().info(
+                    "set ptc hub {} to monitor verifier (address: {}) by tx {} ",
+                    ptcHubContractAddress, monitorVerifierContractAddress, receipt.getTransactionHash()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to set ptc hub (address: %s) to monitor verifier %s",
+                            ptcHubContractAddress, monitorVerifierContractAddress
+                    ), e
+            );
+        }
+    }
+
+    @SneakyThrows
+    public String getPtcHubFromMonitorVerifier(String monitorVerifierContractAddress) {
+        MonitorVerifier monitorVerifier = MonitorVerifier.load(monitorVerifierContractAddress, web3j, rawTransactionManager, new DefaultGasProvider());
+        return monitorVerifier.getPtcHubAddress().send();
+    }
+
     public long querySdpSeq(String sdpContractAddress, String senderDomain, String senderID, String receiverDomain, String receiverID) {
         // 2. load sdpMsg
         SDPMsg sdpMsg = SDPMsg.load(sdpContractAddress, web3j, rawTransactionManager, new DefaultGasProvider());
@@ -397,6 +581,198 @@ public class AcbEthClient {
                     String.format(
                             "failed to set domain (%s) to SDP %s", localDomain, sdpContractAddress
                     ), e
+            );
+        }
+    }
+
+    public void setMonitorContractToSdp(String sdpContractAddress, String monitorContractAddress) {
+        // 2. load sdp contract
+        SDPMsg sdp = SDPMsg.load(
+                sdpContractAddress,
+                this.web3j,
+                this.rawTransactionManager,
+                new AcbGasProvider(
+                        this.contractGasPriceProvider,
+                        createEthCallGasLimitProvider(
+                                sdpContractAddress,
+                                new Function(
+                                        SDPMsg.FUNC_SETMONITORCONTRACT,
+                                        ListUtil.toList(new org.web3j.abi.datatypes.Address(monitorContractAddress)), // inputs
+                                        Collections.emptyList()
+                                )
+                        )
+                )
+        );
+
+        // 3. set monitor to sdp
+        try {
+            var receipt = sdp.setMonitorContract(monitorContractAddress).send();
+            getBbcLogger().info(
+                    "set monitor contract (address: {}) to SDP {} by tx {}",
+                    monitorContractAddress, sdpContractAddress, receipt.getTransactionHash()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format("failed to set monitor contract (address: %s) to SDP %s", monitorContractAddress, sdpContractAddress), e
+            );
+        }
+    }
+
+    @SneakyThrows
+    public String getMonitorContractFromSdp(String sdpContractAddress) {
+        var sdp = SDPMsg.load(sdpContractAddress, web3j, rawTransactionManager, new DefaultGasProvider());
+        return sdp.getMonitorAddress().send();
+    }
+
+    public void setProtocolToMonitor(String monitorContractAddress, String protocolAddress) {
+        // 2. load am contract
+        Monitor monitor = Monitor.load(
+                monitorContractAddress,
+                this.web3j,
+                this.rawTransactionManager,
+                new AcbGasProvider(
+                        this.contractGasPriceProvider,
+                        createEthCallGasLimitProvider(
+                                monitorContractAddress,
+                                new Function(
+                                        Monitor.FUNC_SETPROTOCOL,
+                                        ListUtil.toList(new org.web3j.abi.datatypes.Address(protocolAddress)), // inputs
+                                        Collections.emptyList()
+                                )
+                        )
+                )
+        );
+
+        // 3. set protocol to monitor
+        try {
+            var receipt = monitor.setProtocol(protocolAddress).send();
+            getBbcLogger().info(
+                    "set protocol (address: {}) to monitor {} by tx {} ",
+                    protocolAddress, monitorContractAddress, receipt.getTransactionHash()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to set protocol (address: %s) to monitor %s",
+                            protocolAddress, monitorContractAddress
+                    ), e
+            );
+        }
+    }
+
+    @SneakyThrows
+    public String getProtocolFromMonitor(String monitorContractAddress) {
+        var monitor = Monitor.load(monitorContractAddress, web3j, rawTransactionManager, new DefaultGasProvider());
+        return monitor.getProtocol().send();
+    }
+
+    public void setMonitorControl(String monitorContractAddress, int monitorType) {
+        // load monitor contract
+        Monitor monitor = Monitor.load(
+                monitorContractAddress,
+                this.web3j,
+                this.rawTransactionManager,
+                new AcbGasProvider(
+                        this.contractGasPriceProvider,
+                        createEthCallGasLimitProvider(
+                                monitorContractAddress,
+                                new Function(
+                                        Monitor.FUNC_SETMONITORCONTROL,
+                                        ListUtil.toList(new org.web3j.abi.datatypes.generated.Uint32(monitorType)), // inputs
+                                        Collections.emptyList()
+                                )
+                        )
+                )
+        );
+
+        // set monitorType to monitor
+        try {
+            var receipt = monitor.setMonitorControl(BigInteger.valueOf(monitorType)).send();
+            getBbcLogger().info(
+                    "set monitorType (value: {}) to monitor {} by tx {} ",
+                    monitorType, monitorContractAddress, receipt.getTransactionHash()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "failed to set monitorType (value: %s) to monitor %s",
+                            monitorType, monitorContractAddress
+                    ), e
+            );
+        }
+    }
+
+    @SneakyThrows
+    public int getMonitorControlFromMonitor(String monitorContractAddress) {
+        var monitor = Monitor.load(monitorContractAddress, web3j, rawTransactionManager, new DefaultGasProvider());
+        return monitor.getMonitorControl().send().intValue();
+    }
+
+    public CrossChainMessageReceipt relayMonitorOrderToMonitor(String monitorContractAddress, String committeeId, String signAlgo, byte[] rawProof, byte[] rawMonitorOrder) {
+        // 2. create Transaction
+        try {
+            // 2.1 create function
+            Function function = new Function(
+                    Monitor.FUNC_RECVMONITORORDER, // function name
+                    ListUtil.toList(new Utf8String(committeeId),
+                            new Utf8String(signAlgo),
+                            new DynamicBytes(rawProof),
+                            new DynamicBytes(rawMonitorOrder)), // inputs
+                    Collections.emptyList() // outputs
+            );
+            String encodedFunc = FunctionEncoder.encode(function);
+
+            // 2.2 pre-execute before commit tx
+            EthCall call = this.web3j.ethCall(
+                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(
+                            config.isKmsService() ? this.txKMSSignService.getAddress() : this.credentials.getAddress(),
+                            monitorContractAddress,
+                            encodedFunc
+                    ),
+                    DefaultBlockParameterName.LATEST
+            ).send();
+
+            // 2.3 set `confirmed` and `successful` to false if reverted
+            CrossChainMessageReceipt crossChainMessageReceipt = new CrossChainMessageReceipt();
+            if (call.isReverted()) {
+                getBbcLogger().error("call monitor contract [recvMonitorOrder] {} reverted, reason: {}", monitorContractAddress, call.getRevertReason());
+                crossChainMessageReceipt.setSuccessful(false);
+                crossChainMessageReceipt.setConfirmed(false);
+                crossChainMessageReceipt.setErrorMsg(call.getRevertReason());
+                return crossChainMessageReceipt;
+            }
+
+            // 2.4 async send tx
+            EthSendTransaction ethSendTransaction = rawTransactionManager.sendTransaction(
+                    this.contractGasPriceProvider.getGasPrice(encodedFunc),
+                    createEthCallGasLimitProvider(monitorContractAddress, function).getGasLimit(encodedFunc),
+                    monitorContractAddress,
+                    encodedFunc,
+                    BigInteger.ZERO
+            );
+            if (ObjectUtil.isNull(ethSendTransaction)) {
+                throw new RuntimeException("send tx with null result");
+            }
+            if (ethSendTransaction.hasError()) {
+                throw new RuntimeException(StrUtil.format("tx error: {} - {}",
+                        ethSendTransaction.getError().getCode(), ethSendTransaction.getError().getMessage()));
+            }
+            if (StrUtil.isEmpty(ethSendTransaction.getTransactionHash())) {
+                throw new RuntimeException("tx hash is empty");
+            }
+
+            // 2.5 return crossChainMessageReceipt
+            crossChainMessageReceipt.setConfirmed(false);
+            crossChainMessageReceipt.setSuccessful(true);
+            crossChainMessageReceipt.setTxhash(ethSendTransaction.getTransactionHash());
+            crossChainMessageReceipt.setErrorMsg("");
+
+            getBbcLogger().info("relay monitor order by tx {}", ethSendTransaction.getTransactionHash());
+
+            return crossChainMessageReceipt;
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format("failed to relay monitorOrder to %s", monitorContractAddress), e
             );
         }
     }
@@ -703,7 +1079,7 @@ public class AcbEthClient {
         }
     }
 
-    public String deployPtcHubContract(AbstractCrossChainCertificate bcdnsRootCert, String committeePtcVerifier) {
+    public String deployPtcHubContract(AbstractCrossChainCertificate bcdnsRootCert, String committeePtcVerifier, String monitorVerifier) {
         PtcHub ptcHub;
         try {
             var rawBcdnsRootCert = bcdnsRootCert.encode();
@@ -760,6 +1136,7 @@ public class AcbEthClient {
             getBbcLogger().info("deploy proxy contract for ptc hub: {}", proxy.getContractAddress());
         }
 
+        // set committeePtcVerifier to ptc hub
         ptcHub = PtcHub.load(
                 ptcHubContractAddr,
                 web3j,
@@ -795,6 +1172,46 @@ public class AcbEthClient {
                     String.format(
                             "unexpected failure when setting committee verifier %s to ptc hub %s",
                             committeePtcVerifier, ptcHubContractAddr
+                    ), e
+            );
+        }
+
+        // set monitorVerifier to ptc hub
+        ptcHub = PtcHub.load(
+                ptcHubContractAddr,
+                web3j,
+                rawTransactionManager,
+                new AcbGasProvider(
+                        this.contractGasPriceProvider,
+                        createEthCallGasLimitProvider(
+                                ptcHubContractAddr,
+                                new Function(
+                                        PtcHub.FUNC_SETMONITORVERIFIER,
+                                        ListUtil.toList(new org.web3j.abi.datatypes.Address(monitorVerifier)),
+                                        ListUtil.empty()
+                                )
+                        )
+                )
+        );
+
+        try {
+            TransactionReceipt receipt = ptcHub.setMonitorVerifier(monitorVerifier).send();
+            if (!receipt.isStatusOK()) {
+                throw new RuntimeException(
+                        StrUtil.format(
+                                "transaction {} shows failed when set monitor verifier {} to ptc hub {}: {}",
+                                receipt.getTransactionHash(), monitorVerifier, ptcHubContractAddr, receipt.getRevertReason()
+                        )
+                );
+            }
+            getBbcLogger().info(
+                    "set monitor verifier {} to ptc hub {} by tx {} ", monitorVerifier, ptcHubContractAddr, receipt.getTransactionHash()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format(
+                            "unexpected failure when setting monitor verifier %s to ptc hub %s",
+                            monitorVerifier, ptcHubContractAddr
                     ), e
             );
         }

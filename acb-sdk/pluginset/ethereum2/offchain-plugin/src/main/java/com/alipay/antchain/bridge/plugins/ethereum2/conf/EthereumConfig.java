@@ -88,6 +88,9 @@ public class EthereumConfig {
     private String sdpContractAddressDeployed;
 
     @JSONField
+    private String monitorContractAddressDeployed;
+
+    @JSONField
     private BlockHeightPolicyEnum blockHeightPolicy = BlockHeightPolicyEnum.FINALIZED;
 
     @JSONField

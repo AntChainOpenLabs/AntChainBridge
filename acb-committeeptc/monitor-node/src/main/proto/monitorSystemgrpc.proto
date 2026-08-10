@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.alipay.antchain.bridge.ptc.committee.monitor.system.grpc";
+option java_outer_classname = "MonitorGrpcServerOuter";
+option objc_class_prefix = "MonitorGrpcServer";
+
+package acb.ptc.committee.monitor.node;
+
+// 服务a: 监管节点 --> 监管系统
+service MonitorSystemService {
+
+  rpc heartbeat(Empty) returns (MonitorSystemResponse) {}
+
+  rpc verifyCrossChainMessageInMonitorSystem(VerifyCrossChainMessageInMonitorSystemRequest) returns (MonitorSystemResponse) {}
+
+  rpc relayUcpToMonitorSystem(RelayUcpToMonitorSystemRequest) returns (MonitorSystemResponse) {}
+}
+
+message Empty {}
+
+// 监管节点作为客户端向监管系统请求验证ucp的合法性(VerifyCrossChainMessage方法中调用)
+message VerifyCrossChainMessageInMonitorSystemRequest {
+  bytes rawUcp = 1;
+}
+
+// 接收无需监管的跨链消息，并转发给课题四监管系统供其分析(VerifyCrossChainMessage方法中调用)
+message RelayUcpToMonitorSystemRequest {
+  bytes rawUcp = 1;
+}
+
+message MonitorSystemResponse {
+  uint32 code = 1;
+  string errorMsg = 2;
+  oneof response {
+    VerifyCrossChainMessageInMonitorSystemResponse verifyCrossChainMessageInMonitorSystemResp = 3;
+  }
+}
+
+message VerifyCrossChainMessageInMonitorSystemResponse {
+  uint32 result = 1;
+  string msg = 2;
+}
+
+// 服务b: 监管系统 --> 监管节点
+service MonitorOrderService {
+
+  rpc recvMonitorOrder(RecvMonitorOrderRequest) returns (RecvMonitorOrderResponse) {}
+}
+
+// 接收课题四监管系统发送的监管指令
+message RecvMonitorOrderRequest {
+  MonitorOrder monitorOrder = 1;
+}
+
+message RecvMonitorOrderResponse {
+  uint32 code = 1;
+  string errorMsg = 2;
+}
+
+message MonitorOrder {
+  string product = 1;
+  string domain = 2;
+  uint64 monitorOrderType = 3;
+  string senderDomain = 4;
+  string fromAddress = 5;
+  string receiverDomain = 6;
+  string toAddress = 7;
+  string transactionContent = 8;
+  string extra = 9;
+}
