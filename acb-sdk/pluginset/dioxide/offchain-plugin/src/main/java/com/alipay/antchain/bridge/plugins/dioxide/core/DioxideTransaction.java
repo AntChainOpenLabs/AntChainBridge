@@ -19,6 +19,18 @@ public class DioxideTransaction {
     @JSONField(name = "Hash")
     private String txHash;
 
+    @JSONField(name = "ISN")
+    private Long isn;
+
+    @JSONField(name = "Signers")
+    private List<String> signers;
+
+    @JSONField(name = "Timestamp")
+    private Long timestamp;
+
+    @JSONField(name = "Relays")
+    private List<DioxideTransaction> embeddedRelays;
+
     @JSONField(name = "GasOffered")
     private Integer gasOffered;
 
@@ -60,6 +72,8 @@ public class DioxideTransaction {
 
     @JSONField(name = "ConfirmState")
     private String confirmState;
+    @JSONField(name = "State")
+    private String state;
 
 
     @Data
