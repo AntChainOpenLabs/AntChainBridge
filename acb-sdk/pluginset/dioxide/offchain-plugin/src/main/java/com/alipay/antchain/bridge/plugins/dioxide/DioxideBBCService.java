@@ -329,6 +329,11 @@ public class DioxideBBCService extends AbstractBBCService {
 
     @Override
     public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage) {
+        return relayAuthMessage(rawMessage, "");
+    }
+
+    @Override
+    public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage, String submissionId) {
         // 1. check context
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
@@ -337,10 +342,7 @@ public class DioxideBBCService extends AbstractBBCService {
             throw new RuntimeException("empty am contract in bbc context");
         }
 
-        getBBCLogger().debug("relay AM {} to {} ",
-                HexUtil.encodeHexStr(rawMessage), this.config.getAmContractName());
-
-        return dioxideClient.relayMsgToAuthMsg(rawMessage);
+        return dioxideClient.relayMsgToAuthMsg(rawMessage, submissionId);
 
     }
 

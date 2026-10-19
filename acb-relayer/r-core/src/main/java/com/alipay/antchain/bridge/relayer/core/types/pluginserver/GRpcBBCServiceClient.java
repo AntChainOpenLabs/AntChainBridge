@@ -251,6 +251,11 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
 
     @Override
     public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage) {
+        return relayAuthMessage(rawMessage, "");
+    }
+
+    @Override
+    public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage, String submissionId) {
         Response response = this.blockingStub.withDeadlineAfter(30, TimeUnit.SECONDS).bbcCall(
                 CallBBCRequest.newBuilder()
                         .setProduct(this.getProduct())
@@ -258,6 +263,7 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
                         .setRelayAuthMessageReq(
                                 RelayAuthMessageRequest.newBuilder()
                                         .setRawMessage(ByteString.copyFrom(rawMessage))
+                                        .setSubmissionId(submissionId == null ? "" : submissionId)
                         ).build()
         );
         if (response.getCode() != 0) {

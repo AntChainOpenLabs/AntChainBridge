@@ -30,6 +30,9 @@ public class DioxideConfig {
     @JSONField
     private String privateKey;
 
+    // Optional per-domain path; production normally shares the process-level config file.
+    private String txCoordinatorConfigFile;
+
     // [address / Id]
     @JSONField
     private String amContractAddressDeployed;
