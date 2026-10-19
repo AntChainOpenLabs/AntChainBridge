@@ -25,6 +25,8 @@ import com.google.protobuf.ByteString;
 
 public class GRpcBBCServiceClient implements IBBCServiceClient {
 
+    static final long RECEIPT_QUERY_DEADLINE_SECONDS = 30L;
+
     private String psId;
 
     private final String product;
@@ -108,7 +110,7 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
 
     @Override
     public CrossChainMessageReceipt readCrossChainMessageReceipt(String txhash) {
-        Response response = this.blockingStub.bbcCall(
+        Response response = withReceiptQueryDeadline(this.blockingStub).bbcCall(
                 CallBBCRequest.newBuilder()
                         .setProduct(this.getProduct())
                         .setDomain(this.getDomain())
@@ -125,6 +127,12 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
         return PluginServerUtils.convertFromGRpcCrossChainMessageReceipt(
                 response.getBbcResp().getReadCrossChainMessageReceiptResp().getReceipt()
         );
+    }
+
+    static CrossChainServiceGrpc.CrossChainServiceBlockingStub withReceiptQueryDeadline(
+            CrossChainServiceGrpc.CrossChainServiceBlockingStub stub
+    ) {
+        return stub.withDeadlineAfter(RECEIPT_QUERY_DEADLINE_SECONDS, TimeUnit.SECONDS);
     }
 
     @Override
