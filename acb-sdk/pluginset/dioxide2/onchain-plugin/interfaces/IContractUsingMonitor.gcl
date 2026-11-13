@@ -1,0 +1,7 @@
+contract IContractUsingMonitor {
+    interface ContractUsingMonitorInterface {
+        @global function recvUnorderedMessageFromSDP(array<uint8> senderDomain, array<uint8> author, uint64 receiverID, array<uint8> message) public;
+
+        @global function recvMessageFromSDP(array<uint8> senderDomain, array<uint8> author, uint64 receiverID, array<uint8> message) public;
+    }
+}

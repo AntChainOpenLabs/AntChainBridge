@@ -131,11 +131,21 @@ public class EndorseServiceRepositoryTest extends TestBase {
 
     @Test
     public void testValidatedConsensusState() {
+        var registered = new BlockchainTrustAnchorV1();
+        registered.setDomain(new CrossChainDomain("test"));
+        registered.setSubjectProduct("dioxide2");
+        registered.setBcOwnerPublicKey(new byte[0]);
+        registered.setBcOwnerSig(new byte[0]);
+        registered.setSubjectIdentity(new byte[0]);
+        registered.setBcOwnerSigAlgo(SignAlgoEnum.SHA256_WITH_ECDSA);
+        registered.setPtcOid(new ObjectIdentity(ObjectIdentityType.X509_PUBLIC_KEY_INFO, new byte[0]));
+        registered.setExtension(new byte[0]);
+        endorseServiceRepository.setBta(new BtaWrapper(registered));
         var cs = new ConsensusState(
                 new CrossChainDomain("test"),
                 BigInteger.valueOf(100L),
-                RandomUtil.randomBytes(32),
-                RandomUtil.randomBytes(32),
+                RandomUtil.randomBytes(52),
+                RandomUtil.randomBytes(52),
                 System.currentTimeMillis(),
                 new byte[]{},
                 new byte[]{},

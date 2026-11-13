@@ -89,6 +89,10 @@ public class BlockchainManager implements IBlockchainManager {
 
     private final Map<String, BigInteger> latestVerifyAnchorVersionOnchain = new ConcurrentHashMap<>();
 
+    private static final int MONITOR_CLOSE = 1;
+
+    private static final int MONITOR_OPEN = 2;
+
     @Override
     public void addBlockchain(
             String product,
@@ -198,7 +202,7 @@ public class BlockchainManager implements IBlockchainManager {
             blockchainMeta.setAlias(alias);
             blockchainMeta.setDesc(desc);
             blockchainMeta.updateProperties(blockchainProperties);
-            if (!updateBlockchainMeta(new BlockchainMeta(product, blockchainId, alias, desc, blockchainProperties))) {
+            if (!updateBlockchainMeta(blockchainMeta)) {
                 throw new RuntimeException(
                         StrUtil.format(
                                 "failed to update meta for blockchain {} - {} into DB",
@@ -557,9 +561,38 @@ public class BlockchainManager implements IBlockchainManager {
             return;
         }
 
-        if (blockchainRepository.hasBta(sdpMsgWrapper.getSdpMessage().getTargetDomain())) {
+        // The third-party proof and its TpBTA describe the sending blockchain.
+        // Checking the target domain here skips TpBTA upload whenever only the
+        // source blockchain is trust-enabled, and the subsequent target-chain
+        // submission then fails with "tpbta not found".
+        if (blockchainRepository.hasBta(new CrossChainDomain(sdpMsgWrapper.getSenderBlockchainDomain()))) {
+            AbstractBlockchainClient receivingClient = blockchainClientPool.getClient(
+                    sdpMsgWrapper.getReceiverBlockchainProduct(),
+                    sdpMsgWrapper.getReceiverBlockchainId()
+            );
+            if (ObjectUtil.isNotNull(receivingClient)
+                    && !hasConfiguredPtcContract(receivingClient.queryBBCContext())) {
+                // Some V0 BBC implementations (currently Dioxide) intentionally
+                // verify the relayed AM without an on-chain PTC Hub. Calling the
+                // V1 hasTpBta API for those targets fails before relayAuthMessage
+                // can run. Trust synchronization is only applicable when the
+                // receiving chain actually exposes a configured PTC contract.
+                log.info(
+                        "receiving blockchain {}-{} has no configured ptc contract, skip tpbta upload check",
+                        sdpMsgWrapper.getReceiverBlockchainProduct(),
+                        sdpMsgWrapper.getReceiverBlockchainId()
+                );
+                return;
+            }
             checkTpBtaReadyOnReceivingChain(sdpMsgWrapper, tpProof);
         }
+    }
+
+    static boolean hasConfiguredPtcContract(AbstractBBCContext bbcContext) {
+        return ObjectUtil.isNotNull(bbcContext)
+                && ObjectUtil.isNotNull(bbcContext.getPtcContract())
+                && StrUtil.isNotBlank(bbcContext.getPtcContract().getContractAddress())
+                && !"empty".equalsIgnoreCase(bbcContext.getPtcContract().getContractAddress());
     }
 
     @Override
@@ -919,24 +952,29 @@ public class BlockchainManager implements IBlockchainManager {
             blockchainClient.getAMClientContract().deployContract();
         }
 
-        if (
-                ObjectUtil.isNull(bbcContext.getSdpContract())
-                        || ContractStatusEnum.INIT == bbcContext.getSdpContract().getStatus()
-        ) {
-            blockchainClient.getSDPMsgClientContract().deployContract();
+        // setup-bbccontracts is also the explicit reconciliation entry point
+        // for versioned system-contract upgrades. BBC implementations must
+        // keep setup idempotent when an existing deployment is current.
+        blockchainClient.getSDPMsgClientContract().deployContract();
+
+        // if monitor is supported, it needs to be deployed before ptc
+        boolean isMonitorSupport = true;
+        try {
+            blockchainClient.getMonitorClientContract().deployContract();
+        } catch (BbcInterfaceNotSupportException e) {
+            log.info("setup monitor contract not support for blockchain product: {}", blockchainMeta.getProduct());
+            isMonitorSupport = false;
         }
 
         boolean isPtcSupport = true;
-        if (
-                ObjectUtil.isNull(bbcContext.getPtcContract())
-                        || ContractStatusEnum.INIT == bbcContext.getPtcContract().getStatus()
-        ) {
-            try {
-                blockchainClient.getPtcContract().deployContract();
-            } catch (BbcInterfaceNotSupportException e) {
-                log.info("setup ptc contract not support for blockchain product: {}", blockchainMeta.getProduct());
-                isPtcSupport = false;
-            }
+        try {
+            // setup-bbccontracts is an explicit reconciliation request. The
+            // BBC implementation must be allowed to probe and replace a
+            // legacy PTC Hub even when the persisted context says READY.
+            blockchainClient.getPtcContract().deployContract();
+        } catch (BbcInterfaceNotSupportException e) {
+            log.info("setup ptc contract not support for blockchain product: {}", blockchainMeta.getProduct());
+            isPtcSupport = false;
         }
 
         bbcContext = blockchainClient.queryBBCContext();
@@ -951,6 +989,13 @@ public class BlockchainManager implements IBlockchainManager {
             throw new AntChainBridgeRelayerException(
                     RelayerErrorCodeEnum.CORE_BLOCKCHAIN_ERROR,
                     "sdp contract is empty for blockchain ( product: {}, bcId: {}, pluginServer: {})",
+                    blockchainMeta.getProduct(), blockchainMeta.getBlockchainId(), blockchainMeta.getPluginServerId()
+            );
+        }
+        if (isMonitorSupport && (ObjectUtil.isNull(bbcContext.getMonitorContract()) || StrUtil.isEmpty(bbcContext.getMonitorContract().getContractAddress()))) {
+            throw new AntChainBridgeRelayerException(
+                    RelayerErrorCodeEnum.CORE_BLOCKCHAIN_ERROR,
+                    "monitor contract is empty for blockchain ( product: {}, bcId: {}, pluginServer: {})",
                     blockchainMeta.getProduct(), blockchainMeta.getBlockchainId(), blockchainMeta.getPluginServerId()
             );
         }
@@ -974,10 +1019,29 @@ public class BlockchainManager implements IBlockchainManager {
         blockchainClient.getSDPMsgClientContract()
                 .setAmContract(bbcContext.getAuthMessageContract().getContractAddress());
 
+        if (isMonitorSupport) {
+            blockchainClient.getSDPMsgClientContract()
+                    .setMonitorContract(bbcContext.getMonitorContract().getContractAddress());
+
+            blockchainClient.getMonitorClientContract()
+                    .setMonitorControl(MONITOR_OPEN);
+
+            blockchainClient.getMonitorClientContract()
+                    .setProtocolInMonitor(bbcContext.getSdpContract().getContractAddress());
+
+            if (isPtcSupport) {
+                blockchainClient.getMonitorClientContract()
+                    .setPtcHubInMonitorVerifier(bbcContext.getPtcContract().getContractAddress());
+            }
+        }
+
         bbcContext = blockchainClient.queryBBCContext();
 
         blockchainMeta.getProperties().setAmClientContractAddress(bbcContext.getAuthMessageContract().getContractAddress());
         blockchainMeta.getProperties().setSdpMsgContractAddress(bbcContext.getSdpContract().getContractAddress());
+        if (isMonitorSupport) {
+            blockchainMeta.getProperties().setMonitorContractAddress(bbcContext.getMonitorContract().getContractAddress());
+        }
         if (isPtcSupport) {
             blockchainMeta.getProperties().setPtcContractAddress(bbcContext.getPtcContract().getContractAddress());
         }

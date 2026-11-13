@@ -1,0 +1,27 @@
+// Schema SDPMsg
+namespace Crosschain.SDPMsgSpace;
+
+attribute "map";
+
+table SDPMsgSchema {
+  contract_admins:[Authentic](map); // key: Identity
+  am_contract:string; // Identity
+  this_domain:string; // domain_name
+
+  send_info:[SendContext](map); // key: SHA256(sender_id, receiver_domain, receiver_id)
+  recv_info:[RecvContext](map); // key: SHA256(sender_domain, sender_id, receiver_id)
+}
+
+table Authentic {
+  holder:bool = true;
+}
+
+table SendContext{
+  sequence:uint32 = 0;
+}
+
+table RecvContext{
+  sequence:uint32 = 0;
+}
+
+root_type SDPMsgSchema;

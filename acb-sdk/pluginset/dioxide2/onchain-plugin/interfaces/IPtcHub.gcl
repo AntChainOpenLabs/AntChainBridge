@@ -1,0 +1,5 @@
+contract IPtcHub {
+    interface PtcHubInterface {
+        @global function verifyProof(array<uint8> rawTpProof) public;
+    }
+}

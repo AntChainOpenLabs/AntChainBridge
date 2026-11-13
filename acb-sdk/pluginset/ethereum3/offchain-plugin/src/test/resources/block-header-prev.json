@@ -1,0 +1,10 @@
+{
+  "message": {
+    "slot": "10421199",
+    "proposer_index": "374040",
+    "parent_root": "0xf04db5b98bf75b08ef5b1f4e6d467a362ca3a233a09c3681f4ec4a4b21a18bb4",
+    "state_root": "0xa878c7e15274e611e56f4de5c6781101da690a8ce34232fe9071a981cd7d0e7a",
+    "body_root": "0xf570a46a1d72e39e8880ff1ac52bae2cf87677fc4ea19b8b9a277433cf447642"
+  },
+  "signature": "0xae46d67659412cfe3f986e778c6ec7a3b9266d0f5bd4b57db094b935a3f02cfbf8f7daa10240704ee73182fc48e215ed128867e18fcdb3d23f6b669daa08aaa68a24ae8dd140c647426eb2c280f6dee596d6c45449db0c47d13f4a11016be967"
+}

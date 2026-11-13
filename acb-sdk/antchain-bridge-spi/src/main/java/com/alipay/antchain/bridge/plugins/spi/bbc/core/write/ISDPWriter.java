@@ -41,4 +41,8 @@ public interface ISDPWriter {
      * @param domain the domain value
      */
     void setLocalDomain(String domain);
+
+    default void setMonitorContract(String contractAddress) {
+        throw new UnsupportedOperationException("setMonitorContract is not supported by this BBC");
+    }
 }

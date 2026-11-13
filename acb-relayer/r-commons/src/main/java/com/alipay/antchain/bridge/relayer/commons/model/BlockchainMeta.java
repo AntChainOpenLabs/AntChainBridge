@@ -71,6 +71,7 @@ public class BlockchainMeta {
                 "am_client_contract_address",
                 "sdp_msg_contract_address",
                 "ptc_contract_address",
+                "monitor_contract_address",
                 "anchor_runtime_status",
                 "init_block_height",
                 "is_domain_registered",
@@ -88,6 +89,9 @@ public class BlockchainMeta {
 
         @JSONField(name = "ptc_contract_address")
         private String ptcContractAddress;
+
+        @JSONField(name = "monitor_contract_address")
+        private String monitorContractAddress;
 
         @JSONField(name = "anchor_runtime_status")
         private BlockchainStateEnum anchorRuntimeStatus;
@@ -163,6 +167,12 @@ public class BlockchainMeta {
         }
         if (StrUtil.isNotEmpty(properties.getSdpMsgContractAddress())) {
             this.properties.setSdpMsgContractAddress(properties.getSdpMsgContractAddress());
+        }
+        if (StrUtil.isNotEmpty(properties.getPtcContractAddress())) {
+            this.properties.setPtcContractAddress(properties.getPtcContractAddress());
+        }
+        if (StrUtil.isNotEmpty(properties.getMonitorContractAddress())) {
+            this.properties.setMonitorContractAddress(properties.getMonitorContractAddress());
         }
         if (ObjectUtil.isNotNull(properties.getAnchorRuntimeStatus())) {
             this.properties.setAnchorRuntimeStatus(properties.getAnchorRuntimeStatus());

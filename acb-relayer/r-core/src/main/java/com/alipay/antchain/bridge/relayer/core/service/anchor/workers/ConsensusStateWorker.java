@@ -16,10 +16,16 @@
 
 package com.alipay.antchain.bridge.relayer.core.service.anchor.workers;
 
+import java.math.BigInteger;
+
 import cn.hutool.core.util.ObjectUtil;
+import com.alipay.antchain.bridge.commons.core.base.CrossChainDomain;
+import com.alipay.antchain.bridge.commons.core.base.ConsensusState;
+import com.alipay.antchain.bridge.commons.core.bta.IBlockchainTrustAnchor;
 import com.alipay.antchain.bridge.commons.core.ptc.ValidatedConsensusState;
 import com.alipay.antchain.bridge.ptc.service.IPTCService;
 import com.alipay.antchain.bridge.relayer.commons.exception.PtcVerifyConsensusStateException;
+import com.alipay.antchain.bridge.relayer.commons.model.BtaDO;
 import com.alipay.antchain.bridge.relayer.commons.model.TpBtaDO;
 import com.alipay.antchain.bridge.relayer.commons.model.ValidatedConsensusStateDO;
 import com.alipay.antchain.bridge.relayer.core.service.anchor.context.AnchorProcessContext;
@@ -54,6 +60,8 @@ public class ConsensusStateWorker extends BlockWorker {
             if (ObjectUtil.isNull(ptcService)) {
                 throw new PtcVerifyConsensusStateException("ptc service stub {} is null", tpBtaDO.getPtcServiceId());
             }
+
+            restoreAnchorStateIfNecessary(block, tpBtaDO, ptcService);
 
             ValidatedConsensusStateDO parentVcs = ValidatedConsensusStateDO.builder().build();
             if (!ptcService.getPtcFeatureDescriptor().isStorageEnabled()) {
@@ -114,5 +122,56 @@ public class ConsensusStateWorker extends BlockWorker {
         }
 
         return true;
+    }
+
+    /**
+     * A storage-enabled PTC keeps the verified consensus-state chain on the PTC node. If that
+     * runtime storage is restored from an incomplete snapshot while the relayer database keeps
+     * its anchor progress, the first post-BTA block can no longer be verified because its parent
+     * (the BTA anchor state) is missing.
+     *
+     * Re-submitting the BTA anchor is safe and idempotent on committee PTC nodes. Limit the repair
+     * strictly to {@code initHeight + 1}; a missing parent at any later height is a real continuity
+     * error and must not be hidden by rewinding or fabricating state.
+     */
+    private void restoreAnchorStateIfNecessary(AbstractBlock block, TpBtaDO tpBtaDO, IPTCService ptcService) {
+        if (!ptcService.getPtcFeatureDescriptor().isStorageEnabled()) {
+            return;
+        }
+
+        BtaDO btaDO = getProcessContext().getBlockchainRepository().getBta(new CrossChainDomain(block.getDomain()));
+        if (ObjectUtil.isNull(btaDO) || ObjectUtil.isNull(btaDO.getBta())) {
+            throw new PtcVerifyConsensusStateException("bta is not found for domain {}", block.getDomain());
+        }
+
+        IBlockchainTrustAnchor bta = btaDO.getBta();
+        if (bta.getSubjectVersion() != tpBtaDO.getBtaSubjectVersion()) {
+            throw new PtcVerifyConsensusStateException(
+                    "bta subject version {} does not match tpbta subject version {} for domain {}",
+                    bta.getSubjectVersion(), tpBtaDO.getBtaSubjectVersion(), block.getDomain()
+            );
+        }
+        if (!BigInteger.valueOf(block.getHeight()).equals(bta.getInitHeight().add(BigInteger.ONE))) {
+            return;
+        }
+
+        ConsensusState anchorState = getProcessContext().getBlockchainClient().getConsensusState(bta.getInitHeight());
+        if (ObjectUtil.isNull(anchorState)) {
+            throw new PtcVerifyConsensusStateException(
+                    "failed to query BTA anchor consensus state at height {} for domain {}",
+                    bta.getInitHeight(), block.getDomain()
+            );
+        }
+        ValidatedConsensusState anchorVcs = ptcService.commitAnchorState(bta, tpBtaDO.getTpbta(), anchorState);
+        if (ObjectUtil.isNull(anchorVcs)) {
+            throw new PtcVerifyConsensusStateException(
+                    "ptc {} returned null while restoring BTA anchor state at height {} for domain {}",
+                    tpBtaDO.getPtcServiceId(), bta.getInitHeight(), block.getDomain()
+            );
+        }
+        log.info(
+                "ensured BTA anchor consensus state {}-{} for domain {} on storage-enabled ptc {}",
+                anchorState.getHeight(), anchorState.getHashHex(), block.getDomain(), tpBtaDO.getPtcServiceId()
+        );
     }
 }

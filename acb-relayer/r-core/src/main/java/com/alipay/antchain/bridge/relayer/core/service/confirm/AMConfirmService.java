@@ -26,12 +26,14 @@ import com.alipay.antchain.bridge.relayer.commons.model.SDPMsgWrapper;
 import com.alipay.antchain.bridge.relayer.commons.model.SDPNonceRecordDO;
 import com.alipay.antchain.bridge.relayer.core.manager.blockchain.IBlockchainManager;
 import com.alipay.antchain.bridge.relayer.core.manager.network.IRelayerNetworkManager;
+import com.alipay.antchain.bridge.relayer.core.service.metrics.ExperimentMetricsRecorder;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.AbstractBlockchainClient;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.BlockchainClientPool;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.HeteroBlockchainClient;
 import com.alipay.antchain.bridge.relayer.core.types.network.IRelayerClientPool;
 import com.alipay.antchain.bridge.relayer.core.types.network.RelayerClient;
 import com.alipay.antchain.bridge.relayer.core.types.network.response.QueryCrossChainMsgReceiptsRespPayload;
+import com.alipay.antchain.bridge.relayer.core.service.report.PlatformReportClient;
 import com.alipay.antchain.bridge.relayer.dal.repository.ICrossChainMessageRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -64,6 +66,12 @@ public class AMConfirmService {
 
     @Resource
     private IBlockchainManager blockchainManager;
+
+    @Resource
+    private PlatformReportClient platformReportClient;
+
+    @Resource
+    private ExperimentMetricsRecorder experimentMetricsRecorder;
 
     public void process(String product, String blockchainId) {
         List<SDPMsgWrapper> sdpMsgWrappers = crossChainMessageRepository.peekSDPMessages(
@@ -108,29 +116,40 @@ public class AMConfirmService {
         List<SDPNonceRecordDO> sdpNonceRecordsToSave = new ArrayList<>();
         futureList.forEach(
                 future -> {
-                    ConfirmResult result;
-                    try {
-                        result = future.get();
-                    } catch (InterruptedException | ExecutionException e) {
-                        throw new RuntimeException(
-                                String.format("failed to query cross-chain receipt for ( product: %s, bid: %s )", product, blockchainId),
-                                e
-                        );
+                    ConfirmResult result = resolveConfirmResult(future, product, blockchainId);
+                    if (ObjectUtil.isNull(result)) {
+                        return;
                     }
                     if (result.getReceipt().isConfirmed()) {
-                        SDPMsgCommitResult sdpMsgCommitResult = new SDPMsgCommitResult(
-                                product,
-                                blockchainId,
-                                result.getReceipt().getTxhash(),
-                                result.getReceipt().isSuccessful(),
-                                result.getReceipt().getErrorMsg(),
-                                System.currentTimeMillis()
-                        );
+                        SDPMsgCommitResult sdpMsgCommitResult = buildCommitResult(product, blockchainId, result);
                         if (result.getSdpMsg().getVersion() > 2
                                 && result.getSdpMsg().getSdpMessage().getAtomicFlag().ordinal() < AtomicFlagEnum.ACK_SUCCESS.ordinal()
                                 && result.getSdpMsg().getSdpMessage().getTimeoutMeasure() != TimeoutMeasureEnum.NO_TIMEOUT
                                 && !result.getReceipt().isSuccessful() && blockchainManager.checkAndProcessMessageTimeouts(result.getSdpMsg())) {
                             sdpMsgCommitResult.setTimeout(true);
+                        }
+                        String ucpId = crossChainMessageRepository.getUcpId(
+                                result.getSdpMsg().getAuthMsgWrapper().getAuthMsgId()
+                        );
+                        platformReportClient.reportTargetChainExecution(
+                                ucpId,
+                                result.getReceipt(),
+                                sdpMsgCommitResult.isTimeout()
+                        );
+                        if (result.getReceipt().isSuccessful()) {
+                            experimentMetricsRecorder.recordTargetConfirmed(
+                                    ucpId,
+                                    result.getSdpMsg(),
+                                    result.getReceipt().getTxhash()
+                            );
+                        } else {
+                            experimentMetricsRecorder.recordTargetFailed(
+                                    ucpId,
+                                    result.getSdpMsg(),
+                                    result.getReceipt().getTxhash(),
+                                    sdpMsgCommitResult.isTimeout(),
+                                    result.getReceipt().getErrorMsg()
+                            );
                         }
                         commitResults.add(sdpMsgCommitResult);
 
@@ -157,6 +176,50 @@ public class AMConfirmService {
         crossChainMessageRepository.updateSDPMessageResults(commitResults);
         sdpNonceRecordsToSave.forEach(
                 r -> crossChainMessageRepository.saveSDPNonceRecord(r)
+        );
+    }
+
+    static ConfirmResult resolveConfirmResult(
+            Future<ConfirmResult> future,
+            String product,
+            String blockchainId
+    ) {
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error(
+                    "interrupted while querying cross-chain receipt for ( product: {}, bid: {} )",
+                    product,
+                    blockchainId,
+                    e
+            );
+        } catch (ExecutionException e) {
+            // Receipt availability is per transaction. One temporarily missing
+            // native receipt must not discard confirmed results from the rest
+            // of this batch; the failed row remains TX_PENDING for reconciliation.
+            log.error(
+                    "failed to query one cross-chain receipt for ( product: {}, bid: {} ), keep it pending",
+                    product,
+                    blockchainId,
+                    e.getCause()
+            );
+        }
+        return null;
+    }
+
+    static SDPMsgCommitResult buildCommitResult(String product, String blockchainId, ConfirmResult result) {
+        // The pending row is already known. Updating by its primary key avoids
+        // depending on a plugin's native transaction-hash representation
+        // (notably Dioxide's non-hex hash) for terminal-state persistence.
+        return new SDPMsgCommitResult(
+                result.getSdpMsg().getId(),
+                product,
+                blockchainId,
+                result.getReceipt().getTxhash(),
+                result.getReceipt().isSuccessful(),
+                result.getReceipt().getErrorMsg(),
+                System.currentTimeMillis()
         );
     }
 

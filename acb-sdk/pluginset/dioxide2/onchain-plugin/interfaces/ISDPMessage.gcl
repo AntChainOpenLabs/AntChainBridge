@@ -1,0 +1,50 @@
+contract ISDPMessage {
+    interface SDPMessageInterface {
+        /**
+        * @dev Smart contracts need to call this method to send orderly cross-chain messages in SDPv1.
+        *
+        * The domain name of the sending blockchain, the address of the sender, the domain name of the
+        * receiving blockchain and the address of the receiver uniquely determine a cross-chain channel.
+        * Each channel maintains a sequence number which increases from zero to ensure that the cross-chain
+        * messages of the channel are submitted on blockchain in an orderly manner.
+        *
+        * @param receiverDomain the domain name of the receiving blockchain.
+        * @param receiverID the address of the receiver.
+        * @param message the raw message from DApp contracts
+        */
+        @address function sendMessage(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public;
+
+        /**
+        * @dev Smart contracts call this method to send cross-chain messages out of order in SDPv1.
+        *
+        * The sequence number for unordered message is `0xffffffff` means that this message is out of order.
+        *
+        * @param receiverDomain the domain name of the receiving blockchain.
+        * @param receiverID the address of the receiver.
+        * @param message the raw message from DApp contracts
+        */
+        @address function sendUnorderedMessage(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public;
+
+        @global function sendMessageFromMonitor(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public;
+
+        @global function sendUnorderedMessageFromMonitor(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public;
+
+        /**
+        * @dev Query the current sdp message sequence for the channel identited by `senderDomain`, 
+        * `senderID`, `receiverDomain` and `receiverID`.
+        *
+        * @param senderDomain the domain name of the sending blockchain.
+        * @param senderID the id of the sender.
+        * @param receiverDomain the domain name of the receiving blockchain.
+        * @param receiverID the address of the receiver.
+        */
+        // @address function uint32 querySDPMessageSeq(array<uint8> senderDomain, array<uint8> senderID, array<uint8> receiverDomain, array<uint8> receiverID) public export;
+
+        /**
+        * @dev Set the domain of local chain to `SDP` contract.
+        *
+        * @param domain the domain name of local chain.
+        */
+        @address function setLocalDomain(array<uint8> domain) public export;
+    }
+}

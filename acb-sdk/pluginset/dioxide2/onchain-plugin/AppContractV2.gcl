@@ -1,0 +1,77 @@
+import IContractUsingSDP;
+import IMonitor;
+
+// Append-only test application for Dioxide persistent storage semantics.
+// A new contract name intentionally gives the fixed schema independent state.
+contract AppContractV2 implements IContractUsingSDP.ContractUsingSDPInterface {
+
+    @global address owner;
+    @global uint64 monitorContractId;
+    @global address monitorAddress;
+    @global array<array<uint8>> unorderedMessages;
+    @global array<array<uint8>> orderedMessages;
+
+    @global function on_deploy(address _owner) {
+        owner = _owner;
+    }
+
+    @address function setMonitor(uint64 _monitorContractId, address _monitorAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_monitorContractId, ^_monitorAddress) {
+            monitorContractId = _monitorContractId;
+            monitorAddress = _monitorAddress;
+        }
+    }
+
+    @global function recvUnorderedMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public export {
+        __debug.assert(__transaction.get_sender() == monitorAddress);
+        array<uint8> current;
+        for (uint32 i = 0u32; i < message.length(); i++) {
+            current.push(message[i]);
+        }
+        unorderedMessages.push(current);
+    }
+
+    @global function recvMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public export {
+        __debug.assert(__transaction.get_sender() == monitorAddress);
+        array<uint8> current;
+        for (uint32 i = 0u32; i < message.length(); i++) {
+            current.push(message[i]);
+        }
+        orderedMessages.push(current);
+    }
+
+    @address function sendUnorderedMessage(array<uint8> receiverDomain, array<uint8> receiver, array<uint8> message) public export {
+        IMonitor.MonitorInterface monitor = IMonitor.MonitorInterface(monitorContractId);
+        monitor.sendUnorderedMonitorMessage(receiverDomain, receiver, message, uint64(__id()));
+    }
+
+    @address function sendMessage(array<uint8> receiverDomain, array<uint8> receiver, array<uint8> message) public export {
+        IMonitor.MonitorInterface monitor = IMonitor.MonitorInterface(monitorContractId);
+        monitor.sendMonitorMessage(receiverDomain, receiver, message, uint64(__id()));
+    }
+
+    @global function array<uint8> getLastUoMsg() export const {
+        array<uint8> result;
+        if (unorderedMessages.length() == 0u32) {
+            return result;
+        }
+        const array<uint8> current = unorderedMessages[unorderedMessages.length() - 1u32];
+        for (uint32 i = 0u32; i < current.length(); i++) {
+            result.push(current[i]);
+        }
+        return result;
+    }
+
+    @global function array<uint8> getLastMsg() export const {
+        array<uint8> result;
+        if (orderedMessages.length() == 0u32) {
+            return result;
+        }
+        const array<uint8> current = orderedMessages[orderedMessages.length() - 1u32];
+        for (uint32 i = 0u32; i < current.length(); i++) {
+            result.push(current[i]);
+        }
+        return result;
+    }
+}

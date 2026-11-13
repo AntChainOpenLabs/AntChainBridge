@@ -140,7 +140,22 @@ public enum CommonsErrorCodeEnum {
     /**
      *
      */
-    BCDNS_BID_PUBLIC_KEY_ALGO_NOT_SUPPORT("0706", "BID pubkey algo not support");
+    BCDNS_BID_PUBLIC_KEY_ALGO_NOT_SUPPORT("0706", "BID pubkey algo not support"),
+
+    /**
+     * Something wrong about {@code MonitorMessage}, like version, etc.
+     */
+    INCORRECT_MONITOR_MESSAGE_ERROR("0801", "wrong monitor"),
+
+    /**
+     * Code shows where decode {@code MonitorMessage} failed
+     */
+    MONITOR_MESSAGE_DECODE_ERROR("0802", "monitor decode failed"),
+
+    /**
+     * Something wrong about {@code MonitorOrder}, like version, etc.
+     */
+    INCORRECT_MONITOR_ORDER("0803", "wrong monitor order");
 
     /**
      * Error code for errors happened in project {@code antchain-bridge-commons}

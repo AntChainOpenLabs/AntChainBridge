@@ -1,0 +1,16 @@
+contract SizeOf {
+
+    function uint32 sizeOfBytes(array<uint8> data) public const {
+        uint32 len = data.length();
+        uint32 size = len / 32u32;
+
+        if (len % 32u32 != 0u32) {
+            size++;
+        }
+        // 额外 32 字节存储长度字段
+        size++;
+        // 转换为字节总数
+        size *= 32u32;
+        return size;
+    }
+}

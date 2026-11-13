@@ -20,6 +20,7 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alipay.antchain.bridge.commons.bbc.AbstractBBCContext;
 import com.alipay.antchain.bridge.commons.bbc.DefaultBBCContext;
+import com.alipay.antchain.bridge.commons.bbc.syscontract.MonitorContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.PTCContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.SDPContract;
 import com.alipay.antchain.bridge.commons.core.base.CrossChainDomain;
@@ -42,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 
 import java.math.BigInteger;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Resource;
 
@@ -140,8 +142,23 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
                 case SETUPAUTHMESSAGECONTRACTREQ:
                     resp = handleSetupAuthMessageContract(bbcService, product, domain);
                     break;
+                case SETUPMONITORMESSAGECONTRACTREQ:
+                    resp = handleSetupMonitorMessageContract(bbcService, product, domain);
+                    break;
                 case SETPROTOCOLREQ:
                     resp = handleSetProtocol(bbcService, request.getSetProtocolReq(), product, domain);
+                    break;
+                case SETPROTOCOLINMONITORREQ:
+                    resp = handleSetProtocolInMonitor(bbcService, request.getSetProtocolInMonitorReq(), product, domain);
+                    break;
+                case SETMONITORCONTROLREQ:
+                    resp = handleSetMonitorControl(bbcService, request.getSetMonitorControlReq(), product, domain);
+                    break;
+                case SETPTCHUBINMONITORVERIFIERREQ:
+                    resp = handleSetPtcHubInMonitorVerifier(bbcService, request.getSetPtcHubInMonitorVerifierReq(), product, domain);
+                    break;
+                case SETMONITORCONTRACTREQ:
+                    resp = handleSetMonitorContract(bbcService, request.getSetMonitorContractReq(), product, domain);
                     break;
                 case SETAMCONTRACTREQ:
                     resp = handleSetAmContract(bbcService, request.getSetAmContractReq(), product, domain);
@@ -151,6 +168,9 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
                     break;
                 case RELAYAUTHMESSAGEREQ:
                     resp = handleRelayAuthMessage(bbcService, request.getRelayAuthMessageReq(), product, domain);
+                    break;
+                case RELAYMONITORORDERREQ:
+                    resp = handleRelayMonitorOrder(bbcService, request.getRelayMonitorOrderReq(), product, domain);
                     break;
                 case READCROSSCHAINMESSAGERECEIPTREQ:
                     resp = handleReadCrossChainMessageReceiptRequest(bbcService, request.getReadCrossChainMessageReceiptReq(), product, domain);
@@ -289,6 +309,30 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
         }
     }
 
+    private Response handleSetupMonitorMessageContract(IBBCService bbcService, String product, String domain) {
+        if (!checkBBCSupportMonitor(bbcService)) {
+            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_MONITOR_NOT_SUPPORTED,
+                    StrUtil.format("bbc version not supported, please check plugin code for product {}", product));
+        }
+        try {
+            bbcService.setupMonitorContract();
+            MonitorContract monitor = bbcService.getContext().getMonitorContract();
+            log.info("BBCCall(handleSetupMonitorMessageContract) success [product: {}, domain: {}]: monitorAddr: {}, monitorStatus: {}", product, domain, monitor.getContractAddress(), monitor.getStatus());
+            return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder()
+                    .setSetupMonitorResp(SetupMonitorMessageContractResponse.newBuilder()
+                            .setMonitorContract(
+                                    MonitorMessageContract.newBuilder()
+                                            .setContractAddress(monitor.getContractAddress())
+                                            .setStatusValue(monitor.getStatus().ordinal())
+                            )
+                    )
+            );
+        } catch (Exception e) {
+            log.error("BBCCall(handleSetupMonitorMessageContract) fail [product: {}, domain: {}, errorCode: {}, errorMsg: {}]", product, domain, ServerErrorCodeEnum.BBC_SETUPMONITORMESSAGECONTRACT_ERROR.getErrorCode(), ServerErrorCodeEnum.BBC_SETUPMONITORMESSAGECONTRACT_ERROR.getShortMsg(), e);
+            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_SETUPMONITORMESSAGECONTRACT_ERROR, e.toString());
+        }
+    }
+
     private Response handleSetupSDPMessageContract(IBBCService bbcService, String product, String domain) {
         try {
             bbcService.setupSDPMessageContract();
@@ -336,6 +380,46 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
         }
     }
 
+    private Response handleSetProtocolInMonitor(IBBCService bbcService, SetProtocolInMonitorRequest request, String product, String domain) {
+        try {
+            bbcService.setProtocolInMonitor(request.getProtocolAddress());
+            return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder());
+        } catch (Exception e) {
+            log.error("BBCCall(handleSetProtocolInMonitor) fail [product: {}, domain: {}, errorCode: {}, errorMsg: {}]", product, domain, ServerErrorCodeEnum.BBC_SETPROTOCOLINMONITOR_ERROR.getErrorCode(), ServerErrorCodeEnum.BBC_SETPROTOCOLINMONITOR_ERROR.getShortMsg(), e);
+            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_SETPROTOCOLINMONITOR_ERROR, e.toString());
+        }
+    }
+
+    private Response handleSetMonitorControl(IBBCService bbcService, SetMonitorControlRequest request, String product, String domain) {
+        try {
+            bbcService.setMonitorControl(request.getMonitorType());
+            return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder());
+        } catch (Exception e) {
+            log.error("BBCCall(handleSetMonitorControl) fail [product: {}, domain: {}, errorCode: {}, errorMsg: {}]", product, domain, ServerErrorCodeEnum.BBC_SETMONITORCONTROL_ERROR.getErrorCode(), ServerErrorCodeEnum.BBC_SETMONITORCONTROL_ERROR.getShortMsg(), e);
+            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_SETMONITORCONTROL_ERROR, e.toString());
+        }
+    }
+
+    private Response handleSetPtcHubInMonitorVerifier(IBBCService bbcService, SetPtcHubInMonitorVerifierRequest request, String product, String domain) {
+        try {
+            bbcService.setPtcHubInMonitorVerifier(request.getContractAddress());
+            return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder());
+        } catch (Exception e) {
+            log.error("BBCCall(handleSetPtcHubInMonitorVerifier) fail [product: {}, domain: {}, errorCode: {}, errorMsg: {}]", product, domain, ServerErrorCodeEnum.BBC_SETPTCHUBINMONITORVERIFIER_ERROR.getErrorCode(), ServerErrorCodeEnum.BBC_SETPTCHUBINMONITORVERIFIER_ERROR.getShortMsg(), e);
+            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_SETPTCHUBINMONITORVERIFIER_ERROR, e.toString());
+        }
+    }
+
+    private Response handleSetMonitorContract(IBBCService bbcService, SetMonitorContractRequest request, String product, String domain) {
+        try {
+            bbcService.setMonitorContract(request.getContractAddress());
+            return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder());
+        } catch (Exception e) {
+            log.error("BBCCall(handleSetMonitorContract) fail [product: {}, domain: {}, errorCode: {}, errorMsg: {}]", product, domain, ServerErrorCodeEnum.BBC_SETMONITORCONTRACT_ERROR.getErrorCode(), ServerErrorCodeEnum.BBC_SETMONITORCONTRACT_ERROR.getShortMsg(), e);
+            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_SETMONITORCONTRACT_ERROR, e.toString());
+        }
+    }
+
     private Response handleSetAmContract(IBBCService bbcService, SetAmContractRequest request, String product, String domain) {
         try {
             bbcService.setAmContract(request.getContractAddress());
@@ -362,7 +446,7 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
 
     private Response handleRelayAuthMessage(IBBCService bbcService, RelayAuthMessageRequest request, String product, String domain) {
         try {
-            CrossChainMessageReceipt ret = bbcService.relayAuthMessage(request.getRawMessage().toByteArray());
+            CrossChainMessageReceipt ret = bbcService.relayAuthMessage(request.getRawMessage().toByteArray(), request.getSubmissionId());
             return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder()
                     .setRelayAuthMessageResponse(RelayAuthMessageResponse.newBuilder()
                             .setReceipt(
@@ -379,6 +463,28 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
         } catch (Exception e) {
             log.error("BBCCall(handleRelayAuthMessage) fail [product: {}, domain: {}, errorCode: {}, errorMsg: {}]", product, domain, ServerErrorCodeEnum.BBC_RELAYAUTHMESSAGE_ERROR.getErrorCode(), ServerErrorCodeEnum.BBC_RELAYAUTHMESSAGE_ERROR.getShortMsg(), e);
             return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_RELAYAUTHMESSAGE_ERROR, e.toString());
+        }
+    }
+
+    private Response handleRelayMonitorOrder(IBBCService bbcService, RelayMonitorOrderRequest request, String product, String domain) {
+        try {
+            CrossChainMessageReceipt ret = bbcService.relayMonitorOrder(request.getCommitteeId(), request.getSignAlgo(), request.getRawProof().toByteArray(), request.getRawMonitorOrder().toByteArray());
+            return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder()
+                    .setRelayMonitorOrderResp(RelayMonitorOrderResponse.newBuilder()
+                            .setReceipt(
+                                    com.alipay.antchain.bridge.pluginserver.service.CrossChainMessageReceipt.newBuilder()
+                                            .setTxhash(ObjectUtil.defaultIfNull(ret.getTxhash(), ""))
+                                            .setConfirmed(ret.isConfirmed())
+                                            .setSuccessful(ret.isSuccessful())
+                                            .setErrorMsg(ObjectUtil.defaultIfNull(ret.getErrorMsg(), ""))
+                                            .setTxTimestamp(ret.getTxTimestamp())
+                                            .setRawTx(ByteString.copyFrom(ObjectUtil.defaultIfNull(ret.getRawTx(), new byte[]{})))
+                            )
+                    )
+            );
+        } catch (Exception e) {
+            log.error("BBCCall(handleRelayMonitorOrder) fail [product: {}, domain: {}, errorCode: {}, errorMsg: {}]", product, domain, ServerErrorCodeEnum.BBC_RELAYMONITORORDER_ERROR.getErrorCode(), ServerErrorCodeEnum.BBC_RELAYMONITORORDER_ERROR.getShortMsg(), e);
+            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_RELAYMONITORORDER_ERROR, e.toString());
         }
     }
 
@@ -496,10 +602,8 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
     }
 
     private Response handleReadConsensusState(IBBCService bbcService, ReadConsensusStateRequest request, String product, String domain) {
-        if (!checkBBCVersionSatisfiedV1(bbcService)) {
-            return ResponseBuilder.buildFailResp(ServerErrorCodeEnum.BBC_VERSION_NOT_SUPPORTED,
-                    StrUtil.format("bbc version not supported, please check plugin code for product {}", product));
-        }
+        // Reading consensus data does not require an on-chain PTC Hub. V0
+        // adapters may supply a real reader while retaining their V0 AM path.
         try {
             return ResponseBuilder.buildBBCSuccessResp(
                     CallBBCResponse.newBuilder()
@@ -786,6 +890,10 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
 
     private boolean checkBBCVersionSatisfiedV1(IBBCService bbcService) {
         return Utils.getBBCVersion(bbcService).ordinal() >= BBCVersionEnum.V1.ordinal();
+    }
+
+    private boolean checkBBCSupportMonitor(IBBCService bbcService) {
+        return Utils.checkBBCSupportMonitorContract(bbcService);
     }
 
     private Response handleQueryValidatedBlockStateReq(IBBCService bbcService, QueryValidatedBlockStateRequest request, String product, String domain) {

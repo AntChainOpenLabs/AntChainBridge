@@ -1,0 +1,68 @@
+import Utils;
+
+contract TypesToBytes {
+
+    function bytesToNewBytes(uint32 offset, array<uint8> input, array<uint8> output) public const {
+        array<uint8> inputBytesAlign32 = Utils.bytesAlign32(input);
+        uint32 len = input.length();
+
+        // __debug.print("inputBytesAlign32: ", inputBytesAlign32);
+        // __debug.print("len:", len, " inputBytesAlign32-len: ", inputBytesAlign32.length());
+
+        // 前 32 字节存储长度信息
+        offset -= 32u32;
+        array<uint8> lenBytes = Utils.uint256ToBytes32(uint256(len));
+        for(uint32 i = 0u32; i < 32u32; i++) {
+            output[offset + i] = lenBytes[i];
+        }
+
+        for(uint32 i = 0u32; i < inputBytesAlign32.length();) {
+            offset -= 32u32;
+            // __debug.print("offset:", offset);
+            for(uint32 j = 0u32; j < 32u32; j++) {
+                output[offset+j] = inputBytesAlign32[i];
+                i++;
+            }
+        }
+    }
+
+    function varBytesToNewBytes(uint32 offset, array<uint8> input, array<uint8> output) public const {
+        uint32 len = input.length();
+
+        // 前 4 字节存储长度信息
+        offset -= 4u32;
+        array<uint8> lenBytes = Utils.uint256ToBytes32(uint256(len));
+        for(uint32 i = 28u32; i < 32u32; i++) {
+            output[offset + i - 28u32] = lenBytes[i];
+        }
+
+        for(uint32 i = 0u32; i < len; i++) {
+            output[i] = input[i];
+        }
+    }
+
+    function bytes32ToBytes(uint32 offset, array<uint8> input, array<uint8> output) public const {
+        offset -= 32u32;
+        uint32 inputLen = input.length();
+        for(uint32 i = 0u32; i < 32u32; i++) {
+            if (i < inputLen) {
+                output[offset + i] = input[i];
+            } else {
+                output[offset + i] = 0u8;  // 填充0
+            }
+        }
+    }
+
+    function uint32ToBytes(uint32 offset, uint32 input, array<uint8> output) public const {
+        array<uint8> inputBytes = Utils.uint256ToBytes32(uint256(input));
+        uintToBytes(offset, inputBytes, output, 4u32);
+    }
+
+    function uintToBytes(uint32 offset, array<uint8> input, array<uint8> output, uint32 len) public const {
+        offset -= 32u32;
+        for(uint32 i = 32u32-len; i < 32u32; i++) {
+            output[offset + i] = input[i];
+        }
+    }
+
+}

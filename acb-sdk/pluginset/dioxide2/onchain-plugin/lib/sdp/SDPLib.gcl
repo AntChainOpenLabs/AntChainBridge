@@ -1,0 +1,87 @@
+import Utils;
+import SizeOf;
+import TypesToBytes;
+import BytesToTypes;
+
+contract SDPLib {
+
+    struct SDPMessage {
+        array<uint8> receiverDomain;
+        array<uint8> receiver;
+        array<uint8> message;
+        uint32 sequence;
+    }
+
+    // compatible with SDPv2 (only SDPv1 now)
+    // @global function getSDPVersionFrom(array<uint8>)
+
+    function hash getSendingSeqID(array<uint8> receiverDomain, uint64 senderID, array<uint8> receiver) public const {
+        array<uint8> senderAlign32 = Utils.uint256ToBytes32(uint256(senderID));
+        return hash(Utils.bytesConcat(Utils.bytesConcat(receiverDomain, senderAlign32), receiver));
+    }
+
+    function hash getReceivingSeqID(array<uint8> senderDomain, array<uint8> sender, array<uint8> receiver) public const {
+        return hash(Utils.bytesConcat(Utils.bytesConcat(senderDomain, sender), receiver));
+    }
+
+    function array<uint8> encodeSDPMsgV1(SDPMessage sdpMessage) public const {
+        uint32 messageLen = SizeOf.sizeOfBytes(sdpMessage.message);
+        uint32 domainLen = SizeOf.sizeOfBytes(sdpMessage.receiverDomain);
+        uint32 len = messageLen + 4u32 + 32u32 + domainLen;
+
+        array<uint8> pkg;
+        pkg.set_length(len);
+        uint32 offset = len;
+
+        // domain
+        TypesToBytes.bytesToNewBytes(offset, sdpMessage.receiverDomain, pkg);
+        offset -= domainLen;
+
+        // receiver
+        TypesToBytes.bytes32ToBytes(offset, sdpMessage.receiver, pkg);
+        offset -= 32u32;
+
+        // sequence
+        TypesToBytes.uint32ToBytes(offset, sdpMessage.sequence, pkg);
+        offset -= 4u32;
+
+        // message
+        TypesToBytes.bytesToNewBytes(offset, sdpMessage.message, pkg);
+        offset -= messageLen;
+
+        return pkg;
+    }
+
+    function SDPMessage decodeSDPMsgV1(array<uint8> pkg) public const {
+        uint32 offset = pkg.length();
+        SDPMessage sdpMessage;
+        __debug.print("offset: ", offset);
+
+        // domain
+        BytesToTypes.bytesToSubBytes(offset, pkg, sdpMessage.receiverDomain);
+        offset -= SizeOf.sizeOfBytes(sdpMessage.receiverDomain);
+        __debug.print("sdpMessage.receiverDomain: ", sdpMessage.receiverDomain);
+        __debug.print("offset: ", offset);
+
+        // receiver
+        BytesToTypes.bytesToBytes32(offset, pkg, sdpMessage.receiver);
+        offset -= 32u32;
+        __debug.print("sdpMessage.receiver: ", sdpMessage.receiver);
+        __debug.print("offset: ", offset);
+
+        // sequence
+        sdpMessage.sequence = BytesToTypes.bytesToUint32(offset, pkg);
+        offset -= 4u32;
+        // __debug.print("sdpMessage.sequence: ", sdpMessage.sequence);
+        // __debug.print("offset: ", offset);
+
+        // message
+        BytesToTypes.bytesToSubBytes(offset, pkg, sdpMessage.message);
+        offset -= SizeOf.sizeOfBytes(sdpMessage.message);
+        __debug.print("sdpMessage.message: ", sdpMessage.message);
+        __debug.print("offset: ", offset);
+
+        return sdpMessage;
+    }
+    
+}

@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.alipay.antchain.bridge.ptc.committee.monitor.node.server.grpc";
+option java_outer_classname = "AdminGrpcServerOuter";
+option objc_class_prefix = "AdminGrpcServer";
+
+package acb.ptc.committee.node.admin;
+
+message Response {
+    uint32 code = 1;
+    string errorMsg = 2;
+    oneof response {
+        GetBcdnsServiceInfoResp getBcdnsServiceInfoResp = 3;
+        GetBcdnsCertificateResp getBcdnsCertificateResp = 4;
+    }
+}
+
+message RegisterBcdnsServiceRequest {
+    string domainSpace = 1;
+    string bcdnsType = 2;
+    bytes config = 3;
+    optional string bcdnsRootCert = 4;
+}
+
+message GetBcdnsServiceInfoRequest {
+    string domainSpace = 1;
+}
+
+message GetBcdnsServiceInfoResp {
+    string infoJson = 1;
+}
+
+message DeleteBcdnsServiceRequest {
+    string domainSpace = 1;
+}
+
+message GetBcdnsCertificateRequest {
+    string domainSpace = 1;
+}
+
+message GetBcdnsCertificateResp {
+    string certificate = 1;
+}
+
+message StopBcdnsServiceRequest {
+    string domainSpace = 1;
+}
+
+message RestartBcdnsServiceRequest {
+    string domainSpace = 1;
+}
+
+message AddPtcTrustRootRequest {
+    bytes rawTrustRoot = 1;
+}
+
+// The greeting service definition.
+service AdminService {
+
+    rpc registerBcdnsService(RegisterBcdnsServiceRequest) returns (Response) {}
+
+    rpc getBcdnsServiceInfo(GetBcdnsServiceInfoRequest) returns (Response) {}
+
+    rpc deleteBcdnsService(DeleteBcdnsServiceRequest) returns (Response) {}
+
+    rpc getBcdnsCertificate(GetBcdnsCertificateRequest) returns (Response) {}
+
+    rpc stopBcdnsService(StopBcdnsServiceRequest) returns (Response) {}
+
+    rpc restartBcdnsService(RestartBcdnsServiceRequest) returns (Response) {}
+
+    rpc addPtcTrustRoot(AddPtcTrustRootRequest) returns (Response) {}
+}

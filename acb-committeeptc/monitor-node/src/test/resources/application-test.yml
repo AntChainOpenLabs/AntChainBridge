@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: committee-ptc
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:committee-node;DB_CLOSE_DELAY=-1;MODE=MySQL;IGNORECASE=TRUE
+    password: 123
+    username: root
+  sql:
+    init:
+      data-locations: classpath:data/ddl.sql
+logging:
+  file:
+    path: ./logs
+  level:
+    app: INFO
+  logback:
+    rollingpolicy:
+      clean-history-on-start: true
+committee:
+  id: 1
+  node:
+    credential:
+      sign-algo: "Keccak256WithSecp256k1"
+      private-key-file: ./private_key.pem
+      cert-file: ./ptc.crt
+    admin:
+      port: ${random.int(10088,20088)}
+  plugin:
+    # where to load the hetero-chain plugins
+    repo: ./src/test/resources/plugins
+    policy:
+      # limit actions of the plugin classloader
+      classloader:
+        resource:
+          ban-with-prefix:
+            # the plugin classloader will not read the resource file starting with the prefix below
+            APPLICATION: "META-INF/services/io.grpc."
+grpc:
+  server:
+    port: 0
+    security:
+      enabled: false

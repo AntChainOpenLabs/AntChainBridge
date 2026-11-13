@@ -1,0 +1,38 @@
+[cryptoMaterial]
+
+certPath = "conf"                           # The certification path
+useSMCrypto = "false"
+disableSsl = "true"                        # Communication with nodes without SSL
+
+# The following configurations take the certPath by default if commented
+caCert = "conf/ca.crt"                    # CA cert file path
+sslCert = "conf/sdk.crt"                  # SSL cert file path
+sslKey = "conf/sdk.key"                   # SSL key file path
+
+# The following configurations take the sm certPath by default if commented
+# caCert = "conf/sm_ca.crt"                    # SM CA cert file path
+# sslCert = "conf/sm_sdk.crt"                  # SM SSL cert file path
+# sslKey = "conf/sm_sdk.key"                    # SM SSL key file path
+# enSslCert = "conf/sm_ensdk.crt"               # SM encryption cert file path
+# enSslKey = "conf/sm_ensdk.key"                # SM ssl cert file path
+
+[network]
+messageTimeout = "10000"
+defaultGroup = "group0"
+peers=["172.20.155.69:20200"]    # The peer list to connect
+
+
+[account]
+keyStoreDir = "account"         # The directory to load/store the account file, default is "account"
+# accountFilePath = ""          # The account file path (default load from the path specified by the keyStoreDir)
+accountFileFormat = "pem"       # The storage format of account file (Default is "pem", "p12" as an option)
+
+# accountAddress = ""           # The transactions sending account address
+                                # Default is a randomly generated account
+                                # The randomly generated account is stored in the path specified by the keyStoreDir
+
+# password = ""                 # The password used to load the account file
+
+[threadPool]
+# threadPoolSize = "16"         # The size of the thread pool to process message callback
+                                            # Default is the number of cpu cores

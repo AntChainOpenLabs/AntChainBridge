@@ -25,6 +25,8 @@ import com.google.protobuf.ByteString;
 
 public class GRpcBBCServiceClient implements IBBCServiceClient {
 
+    static final long RECEIPT_QUERY_DEADLINE_SECONDS = 30L;
+
     private String psId;
 
     private final String product;
@@ -108,7 +110,7 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
 
     @Override
     public CrossChainMessageReceipt readCrossChainMessageReceipt(String txhash) {
-        Response response = this.blockingStub.bbcCall(
+        Response response = withReceiptQueryDeadline(this.blockingStub).bbcCall(
                 CallBBCRequest.newBuilder()
                         .setProduct(this.getProduct())
                         .setDomain(this.getDomain())
@@ -125,6 +127,12 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
         return PluginServerUtils.convertFromGRpcCrossChainMessageReceipt(
                 response.getBbcResp().getReadCrossChainMessageReceiptResp().getReceipt()
         );
+    }
+
+    static CrossChainServiceGrpc.CrossChainServiceBlockingStub withReceiptQueryDeadline(
+            CrossChainServiceGrpc.CrossChainServiceBlockingStub stub
+    ) {
+        return stub.withDeadlineAfter(RECEIPT_QUERY_DEADLINE_SECONDS, TimeUnit.SECONDS);
     }
 
     @Override
@@ -211,6 +219,97 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
     }
 
     @Override
+    public void setupMonitorContract() {
+        Response response = this.blockingStub.bbcCall(
+                CallBBCRequest.newBuilder()
+                        .setProduct(this.getProduct())
+                        .setDomain(this.getDomain())
+                        .setSetupMonitorMessageContractReq(SetupMonitorMessageContractRequest.getDefaultInstance())
+                        .build()
+        );
+        if (response.getCode() != 0) {
+            try {
+                handleErrorCode(response);
+            } catch (AntChainBridgeRelayerException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        String.format("[GRpcBBCServiceClient (domain: %s, product: %s)] setupMonitorContract request failed for plugin server %s: %s",
+                                this.domain, this.product, this.psId, response.getErrorMsg())
+                );
+            }
+        }
+    }
+
+    @Override
+    public void setMonitorContract(String monitorContract) {
+        Response response = this.blockingStub.bbcCall(
+                CallBBCRequest.newBuilder()
+                        .setProduct(this.getProduct())
+                        .setDomain(this.getDomain())
+                        .setSetMonitorContractReq(SetMonitorContractRequest.newBuilder().setContractAddress(monitorContract))
+                        .build()
+        );
+        if (response.getCode() != 0) {
+            throw new RuntimeException(
+                    String.format("[GRpcBBCServiceClient (domain: %s, product: %s)] setMonitorContract request failed for plugin server %s: %s",
+                            this.domain, this.product, this.psId, response.getErrorMsg())
+            );
+        }
+    }
+
+    @Override
+    public void setProtocolInMonitor(String protocolContract) {
+        Response response = this.blockingStub.bbcCall(
+                CallBBCRequest.newBuilder()
+                        .setProduct(this.getProduct())
+                        .setDomain(this.getDomain())
+                        .setSetProtocolInMonitorReq(SetProtocolInMonitorRequest.newBuilder().setProtocolAddress(protocolContract))
+                        .build()
+        );
+        if (response.getCode() != 0) {
+            throw new RuntimeException(
+                    String.format("[GRpcBBCServiceClient (domain: %s, product: %s)] setProtocolInMonitor request failed for plugin server %s: %s",
+                            this.domain, this.product, this.psId, response.getErrorMsg())
+            );
+        }
+    }
+
+    @Override
+    public void setMonitorControl(int monitorType) {
+        Response response = this.blockingStub.bbcCall(
+                CallBBCRequest.newBuilder()
+                        .setProduct(this.getProduct())
+                        .setDomain(this.getDomain())
+                        .setSetMonitorControlReq(SetMonitorControlRequest.newBuilder().setMonitorType(monitorType))
+                        .build()
+        );
+        if (response.getCode() != 0) {
+            throw new RuntimeException(
+                    String.format("[GRpcBBCServiceClient (domain: %s, product: %s)] setMonitorControl request failed for plugin server %s: %s",
+                            this.domain, this.product, this.psId, response.getErrorMsg())
+            );
+        }
+    }
+
+    @Override
+    public void setPtcHubInMonitorVerifier(String contractAddress) {
+        Response response = this.blockingStub.bbcCall(
+                CallBBCRequest.newBuilder()
+                        .setProduct(this.getProduct())
+                        .setDomain(this.getDomain())
+                        .setSetPtcHubInMonitorVerifierReq(SetPtcHubInMonitorVerifierRequest.newBuilder().setContractAddress(contractAddress))
+                        .build()
+        );
+        if (response.getCode() != 0) {
+            throw new RuntimeException(
+                    String.format("[GRpcBBCServiceClient (domain: %s, product: %s)] setPtcHubInMonitorVerifier request failed for plugin server %s: %s",
+                            this.domain, this.product, this.psId, response.getErrorMsg())
+            );
+        }
+    }
+
+    @Override
     public void setProtocol(String protocolAddress, String protocolType) {
         Response response = this.blockingStub.bbcCall(
                 CallBBCRequest.newBuilder()
@@ -251,6 +350,11 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
 
     @Override
     public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage) {
+        return relayAuthMessage(rawMessage, "");
+    }
+
+    @Override
+    public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage, String submissionId) {
         Response response = this.blockingStub.withDeadlineAfter(30, TimeUnit.SECONDS).bbcCall(
                 CallBBCRequest.newBuilder()
                         .setProduct(this.getProduct())
@@ -258,6 +362,7 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
                         .setRelayAuthMessageReq(
                                 RelayAuthMessageRequest.newBuilder()
                                         .setRawMessage(ByteString.copyFrom(rawMessage))
+                                        .setSubmissionId(submissionId == null ? "" : submissionId)
                         ).build()
         );
         if (response.getCode() != 0) {
@@ -268,6 +373,11 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
         }
 
         return PluginServerUtils.convertFromGRpcCrossChainMessageReceipt(response.getBbcResp().getRelayAuthMessageResponse().getReceipt());
+    }
+
+    @Override
+    public CrossChainMessageReceipt relayMonitorOrder(String committeeId, String signAlgo, byte[] rawProof, byte[] rawMonitorOrder) {
+        return new CrossChainMessageReceipt();
     }
 
     @Override
@@ -615,7 +725,7 @@ public class GRpcBBCServiceClient implements IBBCServiceClient {
             }
             return;
         }
-        if (response.getCode() == 219) {
+        if (response.getCode() == 219 || response.getCode() == 256) {
             throw new BbcInterfaceNotSupportException();
         }
         throw new RuntimeException(

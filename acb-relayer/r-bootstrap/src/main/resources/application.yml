@@ -33,3 +33,16 @@ relayer:
       tls_client:
         ca_path: file:tls_certs/relayer.crt
         key_path: file:tls_certs/relayer.key
+  # 注意core_validation.ptc_id要属于存在的PTC服务的id之一
+  core_validation:
+    ptc_id: ptc01
+  platform_report:
+    enabled: false
+    endpoint: http://127.0.0.1:49200
+    api_key_path: file:conf/platform-report-api-key
+    connect_timeout_ms: 3000
+    read_timeout_ms: 5000
+
+# Optional per-message latency recorder; no automatic runtime activation.
+experiment_metrics:
+  enabled: false

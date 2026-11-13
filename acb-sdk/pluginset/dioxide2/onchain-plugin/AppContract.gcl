@@ -1,0 +1,215 @@
+import IContractUsingSDP;
+import IMonitor;
+
+// import Monitor;
+
+// Compatibility fixture: persistent arrays in this schema retain backing
+// bytes after shrinking. Use AppContractV2 for exact latest-payload checks;
+// do not add global fields to this deployed contract name in place.
+contract AppContract implements IContractUsingSDP.ContractUsingSDPInterface {
+
+    // 消息列表结构 - 用于存储多条消息
+    struct MessageList {
+        array<array<uint8>> messages;
+    }
+
+    @global address owner;
+    // @global uint64 sdpContractId;
+    // @global address sdpAddress;
+    @global uint64 monitorContractId;
+    @global address monitorAddress;
+
+
+    @global array<uint8> last_uo_msg;
+    @global array<uint8> last_msg;
+
+    // 使用 hash 作为键（对应 Solidity 的 bytes32）
+    // 通过 struct 封装来存储消息数组列表
+    @global map<hash, MessageList> recvMsg;  // hash(author) -> MessageList
+    @global map<hash, MessageList> sendMsg;  // hash(receiver) -> MessageList
+
+    @global function on_deploy(address _owner) {
+        owner = _owner;
+        __debug.print("[on_deploy] AppContract deployed - address:", __address(), " id:", __id());
+
+        // monitorContractId = Monitor.__id();
+        // monitorAddress = Monitor.__address();
+        // __debug.print("[on_deploy] monitor Protocol auto-configured - contractId:", monitorContractId, " address:", monitorAddress);
+    }
+
+    // 辅助函数：将 array<uint8> 转换为 hash（用作 map 键）
+    @global function hash bytesToHash(array<uint8> data) const {
+        // GCL 可以直接从 array<uint8> 构造 hash
+        return hash(data);
+    }
+
+    // @address function setProtocol(uint64 _protocolContractId, address _protocolAddress) public export {
+    //     __debug.assert(__transaction.get_sender() == owner);
+    //     relay@global (^_protocolContractId, ^_protocolAddress) {
+    //         sdpContractId = _protocolContractId;
+    //         sdpAddress = _protocolAddress;
+    //         __debug.print("[setProtocol] contractId: ", sdpContractId, " address: ", sdpAddress);
+    //     }
+    // }
+
+    @address function setMonitor(uint64 _monitorContractId, address _monitorAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_monitorContractId, ^_monitorAddress) {
+            monitorContractId = _monitorContractId;
+            monitorAddress = _monitorAddress;
+            __debug.print("[setMonitorProtocol] monitorContractId: ", monitorContractId, " monitorAddress: ", monitorAddress);
+        }
+    }
+
+    // 私有辅助函数：处理接收到的消息
+    @global function _processReceivedMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message, bool isOrdered) {
+        // __debug.assert(__transaction.get_sender() == sdpAddress);
+        __debug.assert(__transaction.get_sender() == monitorAddress);
+
+        // 存储最新消息到对应的变量
+        if (isOrdered) {
+            last_msg.set_length(0u32);
+            for(uint32 i=0u32; i < message.length(); i++) {
+                last_msg.push(message[i]);
+            }
+        } else {
+            last_uo_msg.set_length(0u32);
+            for(uint32 i=0u32; i < message.length(); i++) {
+                last_uo_msg.push(message[i]);
+            }
+        }
+
+        // 将消息添加到历史记录（使用 hash 作为键）
+        hash authorHash = bytesToHash(author);
+        array<uint8> msgCopy;
+        for(uint32 i=0u32; i < message.length(); i++) {
+            msgCopy.push(message[i]);
+        }
+        // 确保 MessageList 存在，如果不存在则创建
+        if (!recvMsg.has(authorHash)) {
+            MessageList newList;
+            recvMsg[authorHash] = newList;
+        }
+        recvMsg[authorHash].messages.push(msgCopy);
+
+        // 打印事件日志
+        __debug.print("[Event] recvCrosschainMsg - senderDomain:", senderDomain, " author:", author, " message:", message, " isOrdered:", isOrdered);
+    }
+
+    @global function recvUnorderedMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public export {
+        _processReceivedMessage(senderDomain, author, message, false);
+    }
+
+    @global function recvMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public export {
+        _processReceivedMessage(senderDomain, author, message, true);
+    }
+
+    // 私有辅助函数：处理发送消息
+    @address function _processSendMessage(array<uint8> receiverDomain, array<uint8> receiver, array<uint8> message, bool isOrdered) {
+        uint64 senderId = uint64(__id());
+        // ISDPMessage.SDPMessageInterface SDPMsg = ISDPMessage.SDPMessageInterface(sdpContractId);
+        IMonitor.MonitorInterface monitor = IMonitor.MonitorInterface(monitorContractId);
+
+        // // 直接调用 SDPMsg 的发送函数
+        // if (isOrdered) {
+        //     SDPMsg.sendMessage(receiverDomain, receiver, message, senderId);
+        // } else {
+        //     SDPMsg.sendUnorderedMessage(receiverDomain, receiver, message, senderId);
+        // }
+
+        if(isOrdered) {
+            monitor.sendMonitorMessage(receiverDomain, receiver, message, senderId);
+        } else {
+            monitor.sendUnorderedMonitorMessage(receiverDomain, receiver, message, senderId);
+        }
+
+        // 将发送的消息添加到历史记录
+        relay@global (^receiver, ^message) {
+            hash receiverHash = bytesToHash(receiver);
+            array<uint8> msgCopy;
+            for(uint32 i=0u32; i < message.length(); i++) {
+                msgCopy.push(message[i]);
+            }
+            // 确保 MessageList 存在，如果不存在则创建
+            if (!sendMsg.has(receiverHash)) {
+                MessageList newList;
+                sendMsg[receiverHash] = newList;
+            }
+            sendMsg[receiverHash].messages.push(msgCopy);
+        }
+
+        // 打印事件日志
+        __debug.print("[Event] sendCrosschainMsg - receiverDomain:", receiverDomain, " receiver:", receiver, " message:", message, " isOrdered:", isOrdered);
+    }
+
+    @address function sendUnorderedMessage(array<uint8> receiverDomain, array<uint8> receiver, array<uint8> message) public export {
+        _processSendMessage(receiverDomain, receiver, message, false);
+    }
+
+    @address function sendMessage(array<uint8> receiverDomain, array<uint8> receiver, array<uint8> message) public export {
+        _processSendMessage(receiverDomain, receiver, message, true);
+    }
+
+    // Getter 函数
+    @global function array<uint8> getLastUoMsg() export const {
+        array<uint8> result;
+        for (uint32 i = 0u32; i < last_uo_msg.length(); i++) {
+            result.push(last_uo_msg[i]);
+        }
+        return result;
+    }
+
+    @global function array<uint8> getLastMsg() export const {
+        array<uint8> result;
+        for (uint32 i = 0u32; i < last_msg.length(); i++) {
+            result.push(last_msg[i]);
+        }
+        return result;
+    }
+
+    // Getter 函数：获取接收到的消息列表（对应 Solidity 的 public mapping）
+    @global function array<array<uint8>> getRecvMsg(array<uint8> author) export const {
+        hash authorHash = bytesToHash(author);
+        array<array<uint8>> result;
+        if (!recvMsg.has(authorHash)) {
+            return result;  // 返回空数组
+        }
+        const MessageList msgList = recvMsg[authorHash];
+        for (uint32 i = 0u32; i < msgList.messages.length(); i++) {
+            result.push(msgList.messages[i]);
+        }
+        return result;
+    }
+
+    // Getter 函数：获取发送的消息列表（对应 Solidity 的 public mapping）
+    @global function array<array<uint8>> getSendMsg(array<uint8> receiver) export const {
+        hash receiverHash = bytesToHash(receiver);
+        array<array<uint8>> result;
+        if (!sendMsg.has(receiverHash)) {
+            return result;  // 返回空数组
+        }
+        const MessageList msgList = sendMsg[receiverHash];
+        for (uint32 i = 0u32; i < msgList.messages.length(); i++) {
+            result.push(msgList.messages[i]);
+        }
+        return result;
+    }
+
+    // Getter 函数：获取接收消息的数量
+    @global function uint32 getRecvMsgCount(array<uint8> author) export const {
+        hash authorHash = bytesToHash(author);
+        if (!recvMsg.has(authorHash)) {
+            return 0u32;
+        }
+        return recvMsg[authorHash].messages.length();
+    }
+
+    // Getter 函数：获取发送消息的数量
+    @global function uint32 getSendMsgCount(array<uint8> receiver) export const {
+        hash receiverHash = bytesToHash(receiver);
+        if (!sendMsg.has(receiverHash)) {
+            return 0u32;
+        }
+        return sendMsg[receiverHash].messages.length();
+    }
+}

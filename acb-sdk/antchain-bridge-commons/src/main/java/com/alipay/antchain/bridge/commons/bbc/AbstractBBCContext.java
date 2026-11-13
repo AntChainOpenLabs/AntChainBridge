@@ -19,6 +19,7 @@ package com.alipay.antchain.bridge.commons.bbc;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.annotation.JSONField;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.AuthMessageContract;
+import com.alipay.antchain.bridge.commons.bbc.syscontract.MonitorContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.SDPContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.PTCContract;
 import lombok.Getter;
@@ -37,6 +38,9 @@ public abstract class AbstractBBCContext implements IBBCContext {
     @JSONField(name = "sdp_contract")
     private SDPContract sdpContract;
 
+    @JSONField(name = "monitor_contract")
+    private MonitorContract monitorContract;
+
     @JSONField(name = "is_reliable")
     private boolean isReliable;
 
@@ -47,6 +51,7 @@ public abstract class AbstractBBCContext implements IBBCContext {
     public void decodeFromBytes(byte[] raw) {
         AbstractBBCContext state = JSON.parseObject(raw, this.getClass());
         this.setSdpContract(state.getSdpContract());
+        this.setMonitorContract(state.getMonitorContract());
         this.setPtcContract(state.getPtcContract());
         this.setAuthMessageContract(state.getAuthMessageContract());
         this.setReliable(state.isReliable());

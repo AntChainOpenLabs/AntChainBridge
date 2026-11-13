@@ -1,0 +1,191 @@
+import IPtcHub;
+import IMonitorVerifier;
+import TLVUtils;
+import Utils;
+
+contract PtcHub implements IPtcHub.PtcHubInterface {
+
+    struct RawStorage {
+        array<uint8> raw;
+        bool exists;
+    }
+
+    const uint16 TP_PROOF_RAW_PROOF = 0x01ffu16;
+    const uint16 COMMITTEE_PROOF_SIGS = 1u16;
+    const uint16 NODE_PROOF_NODE_ID = 0u16;
+    const uint16 NODE_PROOF_SIGNATURE = 2u16;
+
+    @global address owner;
+    @global address authMessageAddress;
+    @global uint64 monitorVerifierId;
+    @global address monitorVerifierAddress;
+
+    @global map<hash, RawStorage> ptcTrustRoots;
+    @global map<hash, RawStorage> ptcVerifyAnchors;
+    @global map<hash, RawStorage> tpBtas;
+
+    @global function on_deploy(address _owner) {
+        owner = _owner;
+    }
+
+    @address function setAuthMessage(address _authMessageAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_authMessageAddress) {
+            authMessageAddress = _authMessageAddress;
+        }
+    }
+
+    @address function setMonitorVerifier(uint64 _monitorVerifierId, address _monitorVerifierAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_monitorVerifierId, ^_monitorVerifierAddress) {
+            monitorVerifierId = _monitorVerifierId;
+            monitorVerifierAddress = _monitorVerifierAddress;
+        }
+    }
+
+    @global function verifyProof(array<uint8> rawTpProof) public export {
+        __debug.assert(__transaction.get_sender() == authMessageAddress);
+        __debug.assert(monitorVerifierId != 0u64);
+
+        array<uint8> signature;
+        if (rawTpProof.length() > 0u32) {
+            array<uint8> rawCommitteeProof = _findTlvValue(rawTpProof, TP_PROOF_RAW_PROOF);
+            if (rawCommitteeProof.length() > 0u32) {
+                signature = _extractMonitorSignature(rawCommitteeProof);
+            }
+        }
+
+        IMonitorVerifier.MonitorVerifierInterface verifier =
+                IMonitorVerifier.MonitorVerifierInterface(monitorVerifierId);
+        verifier.receiveMonitorNodeProof(signature);
+    }
+
+    @global function array<uint8> _findTlvValue(array<uint8> rawPacket, uint16 expectedTag) const {
+        array<uint8> result;
+        __debug.assert(rawPacket.length() >= 6u32);
+        uint32 packetLength = uint32(rawPacket[2u32])
+                | (uint32(rawPacket[3u32]) << 8u32)
+                | (uint32(rawPacket[4u32]) << 16u32)
+                | (uint32(rawPacket[5u32]) << 24u32);
+        __debug.assert(packetLength == rawPacket.length() - 6u32);
+        uint32 offset = 6u32;
+        while (offset < rawPacket.length()) {
+            TLVUtils.TLVWithOffset item = TLVUtils.parseTLVItem(rawPacket, offset);
+            if (item.tlvItem.tagType == expectedTag && result.length() == 0u32) {
+                result = Utils.bytesCopy(item.tlvItem.value);
+            }
+            offset = item.offset;
+        }
+        __debug.assert(offset == rawPacket.length());
+        return result;
+    }
+
+    @global function array<uint8> _extractMonitorSignature(array<uint8> rawCommitteeProof) const {
+        array<uint8> signatures = _findTlvValue(rawCommitteeProof, COMMITTEE_PROOF_SIGS);
+        array<uint8> result;
+        uint32 offset = 0u32;
+        bool monitorFound = false;
+
+        // The committee proof order is not stable. Keep parsing after finding
+        // the monitor node so the packet is fully consumed and validated.
+        while (offset < signatures.length()) {
+            TLVUtils.LVWithOffset node = TLVUtils.parseLVItem(signatures, offset);
+            array<uint8> nodeId = _findTlvValue(node.lvItem.value, NODE_PROOF_NODE_ID);
+            if (!monitorFound && _isMonitorNode(nodeId)) {
+                monitorFound = true;
+                result = _findTlvValue(node.lvItem.value, NODE_PROOF_SIGNATURE);
+            }
+            offset = node.offset;
+        }
+        __debug.assert(offset == signatures.length());
+        return result;
+    }
+
+    @global function bool _isMonitorNode(array<uint8> nodeId) const {
+        return nodeId.length() >= 7u32
+            && nodeId[0u32] == 109u8
+            && nodeId[1u32] == 111u8
+            && nodeId[2u32] == 110u8
+            && nodeId[3u32] == 105u8
+            && nodeId[4u32] == 116u8
+            && nodeId[5u32] == 111u8
+            && nodeId[6u32] == 114u8;
+    }
+
+    @address function updatePTCTrustRoot(array<uint8> ownerOid, array<uint8> rawTrustRoot) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        array<uint8> empty;
+        hash key = hash(Utils.bytesConcat(ownerOid, empty));
+        relay@global (^key, ^rawTrustRoot) {
+            ptcTrustRoots[key].raw = Utils.bytesCopy(rawTrustRoot);
+            ptcTrustRoots[key].exists = true;
+        }
+    }
+
+    @address function updatePTCVerifyAnchor(array<uint8> ownerOid, array<uint8> version, array<uint8> rawAnchor) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        hash key = hash(Utils.bytesConcat(ownerOid, version));
+        relay@global (^key, ^rawAnchor) {
+            ptcVerifyAnchors[key].raw = Utils.bytesCopy(rawAnchor);
+            ptcVerifyAnchors[key].exists = true;
+        }
+    }
+
+    @address function addTpBta(array<uint8> lane, array<uint8> version, array<uint8> rawTpBta) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        hash key = hash(Utils.bytesConcat(lane, version));
+        relay@global (^key, ^rawTpBta) {
+            tpBtas[key].raw = Utils.bytesCopy(rawTpBta);
+            tpBtas[key].exists = true;
+        }
+    }
+
+    @global function array<uint8> getPTCTrustRoot(array<uint8> ownerOid) export {
+        array<uint8> empty;
+        hash key = hash(Utils.bytesConcat(ownerOid, empty));
+        array<uint8> result;
+        if (ptcTrustRoots.has(key) && ptcTrustRoots[key].exists) {
+            result = Utils.bytesCopy(ptcTrustRoots[key].raw);
+        }
+        return result;
+    }
+
+    @global function bool hasPTCTrustRoot(array<uint8> ownerOid) export const {
+        array<uint8> empty;
+        hash key = hash(Utils.bytesConcat(ownerOid, empty));
+        return ptcTrustRoots.has(key) && ptcTrustRoots[key].exists;
+    }
+
+    @global function array<uint8> getPTCVerifyAnchor(array<uint8> ownerOid, array<uint8> version) export {
+        hash key = hash(Utils.bytesConcat(ownerOid, version));
+        array<uint8> result;
+        if (ptcVerifyAnchors.has(key) && ptcVerifyAnchors[key].exists) {
+            result = Utils.bytesCopy(ptcVerifyAnchors[key].raw);
+        }
+        return result;
+    }
+
+    @global function bool hasPTCVerifyAnchor(array<uint8> ownerOid, array<uint8> version) export const {
+        hash key = hash(Utils.bytesConcat(ownerOid, version));
+        return ptcVerifyAnchors.has(key) && ptcVerifyAnchors[key].exists;
+    }
+
+    @global function array<uint8> getTpBta(array<uint8> lane, array<uint8> version) export {
+        hash key = hash(Utils.bytesConcat(lane, version));
+        array<uint8> result;
+        if (tpBtas.has(key) && tpBtas[key].exists) {
+            result = Utils.bytesCopy(tpBtas[key].raw);
+        }
+        return result;
+    }
+
+    @global function bool hasTpBta(array<uint8> lane, array<uint8> version) export const {
+        hash key = hash(Utils.bytesConcat(lane, version));
+        return tpBtas.has(key) && tpBtas[key].exists;
+    }
+
+    @global function uint32 getSupportedPTCType() export const {
+        return 1u32;
+    }
+
+}

@@ -19,7 +19,13 @@ public class BlockPollingTask extends BlockBaseTask {
     public void doProcess() {
         try {
             long latestHeight = queryRemoteBlockHeaderHeight();
-            if (getRemoteBlockHeaderHeight() < latestHeight) {
+            long recordedHeight = getRemoteBlockHeaderHeight();
+            ensureNoRemoteHeightRollback(
+                    recordedHeight,
+                    latestHeight,
+                    getProcessContext().getBlockchainMeta().getMetaKey()
+            );
+            if (recordedHeight < latestHeight) {
                 log.info("polling height {} remote block header from {}", latestHeight, getProcessContext().getBlockchainMeta().getMetaKey());
                 saveRemoteBlockHeaderHeight(latestHeight);
             }
@@ -35,5 +41,20 @@ public class BlockPollingTask extends BlockBaseTask {
 
     private long queryRemoteBlockHeaderHeight() {
         return getProcessContext().getBlockchainClient().getLastBlockHeight();
+    }
+
+    static void ensureNoRemoteHeightRollback(long recordedHeight, long latestHeight, String metaKey) {
+        if (recordedHeight <= latestHeight) {
+            return;
+        }
+        throw new IllegalStateException(
+                String.format(
+                        "remote blockchain height rollback detected for %s: recorded=%d, remote=%d; "
+                                + "stop the anchor and reconcile polling/sync/notify cursors before restart",
+                        metaKey,
+                        recordedHeight,
+                        latestHeight
+                )
+        );
     }
 }
