@@ -27,6 +27,7 @@ import com.alipay.antchain.bridge.relayer.commons.exception.AntChainBridgeRelaye
 import com.alipay.antchain.bridge.relayer.commons.exception.RelayerErrorCodeEnum;
 import com.alipay.antchain.bridge.relayer.commons.model.*;
 import com.alipay.antchain.bridge.relayer.core.manager.blockchain.IBlockchainManager;
+import com.alipay.antchain.bridge.relayer.core.service.metrics.ExperimentMetricsRecorder;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.AbstractBlockchainClient;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.BlockchainClientPool;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.HeteroBlockchainClient;
@@ -73,6 +74,8 @@ public class CommitterService {
     @Resource
     private PlatformReportClient platformReportClient;
 
+    @Resource
+    private ExperimentMetricsRecorder experimentMetricsRecorder;
 
     @Value("${relayer.service.committer.ccmsg.batch_size:32}")
     private int commitBatchSize;
@@ -419,9 +422,25 @@ public class CommitterService {
         PTCProofResult proof = ObjectUtil.isNull(tpProof) ? null : new PTCProofResult(tpProof);
 
         String ucpId = sdpMsgWrapper.getAuthMsgWrapper().getUcpId();
-        SendResponseResult res = heteroBlockchainClient.getAMClientContract()
-                .recvPkgFromRelayer(AuthMsgPackage.convertFrom(
-                        Collections.singletonList(sdpMsgWrapper), Collections.singletonList(proof)));
+        ExperimentMetricsRecorder.SubmissionAttempt experimentSubmission =
+                experimentMetricsRecorder.beginTargetSubmission(ucpId, sdpMsgWrapper);
+        SendResponseResult res;
+        try {
+            res = heteroBlockchainClient.getAMClientContract()
+                    .recvPkgFromRelayer(
+                            AuthMsgPackage.convertFrom(
+                                    Collections.singletonList(sdpMsgWrapper),
+                                    Collections.singletonList(proof)));
+            experimentMetricsRecorder.recordTargetSubmitting(
+                    experimentSubmission,
+                    res == null ? null : res.getTxId(),
+                    res != null && res.isSuccess()
+            );
+        } catch (RuntimeException e) {
+            experimentMetricsRecorder.recordTargetSubmitting(experimentSubmission, null, false);
+            experimentMetricsRecorder.recordTargetFailed(ucpId, sdpMsgWrapper, null, false, e.getMessage());
+            throw e;
+        }
 
         // Send tx result situations:
         //
@@ -442,12 +461,16 @@ public class CommitterService {
                     && sdpMsgWrapper.getSdpMessage().getTimeoutMeasure() != TimeoutMeasureEnum.NO_TIMEOUT) {
                 isTimeout = blockchainManager.checkAndProcessMessageTimeouts(sdpMsgWrapper);
                 if (!isTimeout) {
-
+                    experimentMetricsRecorder.recordTargetFailed(
+                            ucpId, sdpMsgWrapper, res.getTxId(), false, res.getErrorMessage()
+                    );
                     throw new RuntimeException(StrUtil.format("failed to commit msgs: (error_code: {}, error_msg: {})",
                             res.getErrorCode(), res.getErrorMessage()));
                 }
             } else {
-
+                experimentMetricsRecorder.recordTargetFailed(
+                        ucpId, sdpMsgWrapper, res.getTxId(), false, res.getErrorMessage()
+                );
                 throw new RuntimeException(StrUtil.format("failed to commit msgs: (error_code: {}, error_msg: {})",
                         res.getErrorCode(), res.getErrorMessage()));
             }
@@ -455,6 +478,17 @@ public class CommitterService {
 
         platformReportClient.reportTargetChainSubmission(ucpId, sdpMsgWrapper, res);
         platformReportClient.reportTargetChainExecution(ucpId, res, isTimeout);
+        if (res.isConfirmed() && res.isSuccess()) {
+            experimentMetricsRecorder.recordTargetConfirmed(ucpId, sdpMsgWrapper, res.getTxId());
+        } else if (!res.isSuccess() || isTimeout) {
+            experimentMetricsRecorder.recordTargetFailed(
+                    ucpId,
+                    sdpMsgWrapper,
+                    res.getTxId(),
+                    isTimeout,
+                    res.getErrorMessage()
+            );
+        }
 
         // 4. 更新sdp记录表（若当前未成功，等待AMComfiredService查询提交结果）
         SDPMsgProcessStateEnum state = calculateSDPProcessState(res.isConfirmed(), res.isSuccess(), isTimeout);

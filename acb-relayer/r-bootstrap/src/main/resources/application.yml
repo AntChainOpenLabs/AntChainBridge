@@ -42,3 +42,7 @@ relayer:
     api_key_path: file:conf/platform-report-api-key
     connect_timeout_ms: 3000
     read_timeout_ms: 5000
+
+# Optional per-message latency recorder; no automatic runtime activation.
+experiment_metrics:
+  enabled: false

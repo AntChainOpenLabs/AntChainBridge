@@ -16,6 +16,7 @@ import com.alipay.antchain.bridge.relayer.commons.model.SDPMsgWrapper;
 import com.alipay.antchain.bridge.relayer.commons.model.UniformCrosschainPacketContext;
 import com.alipay.antchain.bridge.relayer.core.manager.blockchain.IBlockchainManager;
 import com.alipay.antchain.bridge.relayer.core.manager.network.IRelayerNetworkManager;
+import com.alipay.antchain.bridge.relayer.core.service.metrics.ExperimentMetricsRecorder;
 import com.alipay.antchain.bridge.relayer.core.service.report.PlatformReportClient;
 import com.alipay.antchain.bridge.relayer.dal.repository.ICrossChainMessageRepository;
 import com.alipay.antchain.bridge.relayer.dal.repository.IScheduleRepository;
@@ -45,6 +46,8 @@ public class AsyncReceiveHandler {
     @Resource
     private PlatformReportClient platformReportClient;
 
+    @Resource
+    private ExperimentMetricsRecorder experimentMetricsRecorder;
 
     public void receiveUniformCrosschainPackets(List<UniformCrosschainPacketContext> ucpContexts) {
         int rowsNum = crossChainMessageRepository.putUniformCrosschainPackets(ucpContexts);
@@ -63,7 +66,7 @@ public class AsyncReceiveHandler {
         ucpContexts.stream()
                 .filter(context -> !context.isFromNetwork())
                 .forEach(context -> {
-
+                    experimentMetricsRecorder.recordSourceAccepted(context);
                     platformReportClient.reportUcp(context);
                 });
     }
@@ -121,6 +124,17 @@ public class AsyncReceiveHandler {
                         ucpId,
                         result
                 );
+                if (result.isCommitSuccess()) {
+                    experimentMetricsRecorder.recordTargetConfirmed(ucpId, message, result.getTxHash());
+                } else {
+                    experimentMetricsRecorder.recordTargetFailed(
+                            ucpId,
+                            message,
+                            result.getTxHash(),
+                            result.isTimeout(),
+                            result.getFailReason()
+                    );
+                }
             }
         });
 

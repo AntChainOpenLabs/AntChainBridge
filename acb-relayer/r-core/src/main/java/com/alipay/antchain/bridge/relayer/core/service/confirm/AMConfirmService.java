@@ -26,6 +26,7 @@ import com.alipay.antchain.bridge.relayer.commons.model.SDPMsgWrapper;
 import com.alipay.antchain.bridge.relayer.commons.model.SDPNonceRecordDO;
 import com.alipay.antchain.bridge.relayer.core.manager.blockchain.IBlockchainManager;
 import com.alipay.antchain.bridge.relayer.core.manager.network.IRelayerNetworkManager;
+import com.alipay.antchain.bridge.relayer.core.service.metrics.ExperimentMetricsRecorder;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.AbstractBlockchainClient;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.BlockchainClientPool;
 import com.alipay.antchain.bridge.relayer.core.types.blockchain.HeteroBlockchainClient;
@@ -69,6 +70,8 @@ public class AMConfirmService {
     @Resource
     private PlatformReportClient platformReportClient;
 
+    @Resource
+    private ExperimentMetricsRecorder experimentMetricsRecorder;
 
     public void process(String product, String blockchainId) {
         List<SDPMsgWrapper> sdpMsgWrappers = crossChainMessageRepository.peekSDPMessages(
@@ -133,6 +136,21 @@ public class AMConfirmService {
                                 result.getReceipt(),
                                 sdpMsgCommitResult.isTimeout()
                         );
+                        if (result.getReceipt().isSuccessful()) {
+                            experimentMetricsRecorder.recordTargetConfirmed(
+                                    ucpId,
+                                    result.getSdpMsg(),
+                                    result.getReceipt().getTxhash()
+                            );
+                        } else {
+                            experimentMetricsRecorder.recordTargetFailed(
+                                    ucpId,
+                                    result.getSdpMsg(),
+                                    result.getReceipt().getTxhash(),
+                                    sdpMsgCommitResult.isTimeout(),
+                                    result.getReceipt().getErrorMsg()
+                            );
+                        }
                         commitResults.add(sdpMsgCommitResult);
 
                         log.info("sdp confirmed : (tx: {}, is_success: {}, error_msg: {})",
