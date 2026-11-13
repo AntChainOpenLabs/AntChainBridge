@@ -186,11 +186,6 @@ public class EndorserServiceImpl implements IEndorserService {
             throw new InvalidConsensusStateException("bta not found for {}", crossChainLane.getSenderDomain().getDomain());
         }
 
-        var hcdvs = hcdvsPluginService.getHCDVSService(bta.getProduct());
-        if (ObjectUtil.isNull(hcdvs)) {
-            throw new CommitteeNodeInternalException("hcdvs not found for {}", bta.getProduct());
-        }
-
         if (!bta.getBta().getInitHeight().equals(anchorState.getHeight())) {
             throw new InvalidConsensusStateException("invalid height: bta's is {} and yours {}",
                     bta.getBta().getInitHeight().toString(), anchorState.getHeight().toString());
@@ -200,6 +195,11 @@ public class EndorserServiceImpl implements IEndorserService {
                     HexUtil.encodeHexStr(bta.getBta().getInitBlockHash()), anchorState.getHashHex());
         }
 
+
+        var hcdvs = hcdvsPluginService.getHCDVSService(bta.getProduct());
+        if (ObjectUtil.isNull(hcdvs)) {
+            throw new CommitteeNodeInternalException("hcdvs not found for {}", bta.getProduct());
+        }
         return processValidatedConsensusState(anchorState, tpbta, hcdvs.verifyAnchorConsensusState(bta.getBta(), anchorState));
     }
 
@@ -221,6 +221,7 @@ public class EndorserServiceImpl implements IEndorserService {
             throw new InvalidConsensusStateException("parent consensus state not found for {}", currState.getParentHashHex());
         }
 
+
         var hcdvs = hcdvsPluginService.getHCDVSService(bta.getProduct());
         if (ObjectUtil.isNull(hcdvs)) {
             throw new CommitteeNodeInternalException("hcdvs not found for {}", bta.getProduct());
@@ -239,6 +240,7 @@ public class EndorserServiceImpl implements IEndorserService {
         if (ObjectUtil.isNull(bta)) {
             throw new InvalidCrossChainMessageException("bta not found for {}", crossChainLane.getSenderDomain().getDomain());
         }
+
         var consensusState = endorseServiceRepository.getValidatedConsensusState(
                 ucp.getSrcDomain().getDomain(),
                 ucp.getSrcMessage().getProvableData().getBlockHashHex()
@@ -271,6 +273,10 @@ public class EndorserServiceImpl implements IEndorserService {
             throw new InvalidCrossChainMessageException("cross chain message verification failed: {}", verifyResult.getErrorMsg());
         }
 
+        return signUcp(tpbta, crossChainLane, ucp);
+    }
+
+    private CommitteeNodeProof signUcp(TpBtaWrapper tpbta, CrossChainLane crossChainLane, UniformCrosschainPacket ucp) {
         return CommitteeNodeProof.builder()
                 .nodeId(committeeNodeId)
                 .signAlgo(nodeSignAlgo)
@@ -283,6 +289,7 @@ public class EndorserServiceImpl implements IEndorserService {
                         ).getEncodedToSign()
                 )).build();
     }
+
 
     @Override
     public EndorseBlockStateResp endorseBlockState(CrossChainLane crossChainLane, String receiverDomain, BigInteger height) {

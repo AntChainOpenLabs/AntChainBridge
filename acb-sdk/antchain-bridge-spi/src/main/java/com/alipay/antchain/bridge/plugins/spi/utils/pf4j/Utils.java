@@ -28,6 +28,7 @@ import com.alipay.antchain.bridge.plugins.spi.bbc.core.BBCVersionEnum;
 public class Utils {
 
     private static final String FUNC_NAME_UPDATE_PTC_TRUST_ROOT = "updatePTCTrustRoot(com.alipay.antchain.bridge.commons.core.ptc.PTCTrustRoot)";
+    private static final String FUNC_NAME_SETUP_MONITOR_CONTRACT = "setupMonitorContract()";
 
     public static BBCVersionEnum getBBCVersion(IBBCService bbcService) {
         Set<String> methods = ListUtil.toList(bbcService.getClass().getDeclaredMethods()).stream()
@@ -36,5 +37,14 @@ public class Utils {
             return BBCVersionEnum.V1;
         }
         return BBCVersionEnum.V0;
+    }
+
+    public static boolean checkBBCSupportMonitorContract(IBBCService bbcService) {
+        Set<String> methods = ListUtil.toList(bbcService.getClass().getDeclaredMethods()).stream()
+                .map(Method::toGenericString).collect(Collectors.toSet());
+        if (methods.stream().anyMatch(x -> StrUtil.endWith(x, FUNC_NAME_SETUP_MONITOR_CONTRACT))) {
+            return true;
+        }
+        return false;
     }
 }

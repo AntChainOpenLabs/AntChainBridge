@@ -384,6 +384,7 @@ public class CommitteeNodeServiceImpl extends CommitteeNodeServiceGrpc.Committee
                             .setQuerySupportedBlockchainProductsResp(
                                     QuerySupportedBlockchainProductsResponse.newBuilder()
                                             .addAllProducts(hcdvsPluginService.getAvailableProducts())
+                                            .addProducts("dioxide2")
                                             .build()
                             ).build()
             );

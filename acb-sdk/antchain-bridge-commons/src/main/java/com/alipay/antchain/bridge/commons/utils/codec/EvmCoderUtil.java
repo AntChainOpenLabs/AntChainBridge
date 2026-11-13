@@ -23,14 +23,34 @@ import cn.hutool.core.util.ByteUtil;
 public class EvmCoderUtil {
 
     public static CoderResult<byte[]> parseVarBytes(byte[] rawMessage, int offset) {
+        if (rawMessage == null) {
+            throw new IllegalArgumentException("raw message is null");
+        }
+        if (offset < 32 || offset > rawMessage.length) {
+            throw new IllegalArgumentException("invalid EVM var-bytes offset: " + offset);
+        }
+
         offset -= 4;
         byte[] rawLen = new byte[4];
         System.arraycopy(rawMessage, offset, rawLen, 0, 4);
+        int rawLength = ByteUtil.bytesToInt(rawLen, ByteOrder.BIG_ENDIAN);
+        if (rawLength < 0) {
+            throw new IllegalArgumentException("negative EVM var-bytes length");
+        }
+
+        long evmWordCount = ((long) rawLength + 31L) / 32L;
+        long encodedLength = 32L + evmWordCount * 32L;
+        long originalOffset = (long) offset + 4L;
+        if (encodedLength > originalOffset) {
+            throw new IllegalArgumentException(
+                    "EVM var-bytes length " + rawLength + " exceeds available input"
+            );
+        }
         offset -= 28;
 
-        byte[] raw = new byte[ByteUtil.bytesToInt(rawLen, ByteOrder.BIG_ENDIAN)];
+        byte[] raw = new byte[rawLength];
 
-        int evmWordCnt = calcEvmWordNum(raw.length);
+        int evmWordCnt = (int) evmWordCount;
         int index = 0;
         while (evmWordCnt-- > 0) {
             offset -= 32;

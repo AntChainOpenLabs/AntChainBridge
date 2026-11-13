@@ -60,6 +60,25 @@ public interface INodeClient {
      */
     CommitteeNodeProof verifyCrossChainMessage(CrossChainLane crossChainLane, UniformCrosschainPacket packet);
 
+    default NodeVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            CrossChainLane crossChainLane,
+            UniformCrosschainPacket packet
+    ) {
+        return new NodeVerifyCrossChainMessageResult(
+                verifyCrossChainMessage(crossChainLane, packet),
+                "",
+                ""
+        );
+    }
+
+    default NodeVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            CrossChainLane crossChainLane,
+            UniformCrosschainPacket packet,
+            String ucpId
+    ) {
+        return verifyCrossChainMessageWithResult(crossChainLane, packet);
+    }
+
     BlockState queryBlockState(CrossChainDomain blockchainDomain);
 
     EndorseBlockStateResp endorseBlockState(CrossChainLane tpbtaLane, CrossChainDomain receiverDomain, BigInteger height);

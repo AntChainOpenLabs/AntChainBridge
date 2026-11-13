@@ -93,6 +93,7 @@ public class Mychain010BBCContext extends AbstractBBCContext {
     public byte[] encodeToBytes() {
         DefaultBBCContext persistedContext = new DefaultBBCContext();
         persistedContext.setSdpContract(this.getSdpContract());
+        persistedContext.setMonitorContract(this.getMonitorContract());
         persistedContext.setPtcContract(this.getPtcContract());
         persistedContext.setAuthMessageContract(this.getAuthMessageContract());
         persistedContext.setReliable(this.isReliable());

@@ -857,6 +857,7 @@ public class FISCOBCOSBBCServiceTest {
     public void testLiveEndToEnd() {
         setupBbc();
 
+        Assert.assertNull(fiscobcosBBCService.getBbcContext().getMonitorContract());
         Assert.assertTrue(fiscobcosBBCService.hasPTCTrustRoot(oid));
         Assert.assertTrue(fiscobcosBBCService.hasPTCVerifyAnchor(oid, BigInteger.ONE));
         Assert.assertTrue(fiscobcosBBCService.hasTpBta(

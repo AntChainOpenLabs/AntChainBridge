@@ -1,0 +1,13 @@
+spring:
+  shell:
+    interactive:
+      enabled: true
+    history:
+      name: ".monitor-node-cli-history"
+logging:
+  level:
+    root: off
+grpc:
+  client:
+    admin:
+      negotiation-type: plaintext

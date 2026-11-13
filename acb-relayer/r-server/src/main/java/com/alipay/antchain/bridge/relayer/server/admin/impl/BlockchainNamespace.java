@@ -189,6 +189,12 @@ public class BlockchainNamespace extends AbstractNamespace {
                 )
         );
 
+        sysContractsInfo.setMonitorContract(
+                ObjectUtil.defaultIfNull(
+                        blockchainMeta.getProperties().getMonitorContractAddress(), "empty"
+                )
+        );
+
         OnChainServiceStatusEnum amStatus = blockchainMeta.getProperties().getAmServiceStatus();
         sysContractsInfo.setState(
                 ObjectUtil.isNull(amStatus)? "" : amStatus.name()

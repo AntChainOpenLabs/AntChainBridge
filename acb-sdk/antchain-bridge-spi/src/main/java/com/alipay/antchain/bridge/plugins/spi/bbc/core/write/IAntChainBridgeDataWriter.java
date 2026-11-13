@@ -40,7 +40,7 @@ import com.alipay.antchain.bridge.commons.core.base.CrossChainMessageReceipt;
  *     interfaces like {@link IAMWriter}, {@link ISDPWriter}.
  * </p>
  */
-public interface IAntChainBridgeDataWriter extends IAMWriter, ISDPWriter {
+public interface IAntChainBridgeDataWriter extends IAMWriter, ISDPWriter, IMonitorWriter {
 
     /**
      * Set up the AuthMessage contract.
@@ -65,6 +65,14 @@ public interface IAntChainBridgeDataWriter extends IAMWriter, ISDPWriter {
      */
     void setupSDPMessageContract();
 
+    /**
+     * Set up the monitor contracts, including monitor and monitorVerifier contract
+     */
+    default void setupMonitorContract() {
+        throw new UnsupportedOperationException(
+                "setupMonitorContract is not supported in this BBC version"
+        );
+    }
     /**
      * Set up the PTC contracts. For example PTCHub and its verify contracts
      */

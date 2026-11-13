@@ -12,9 +12,11 @@ import com.alipay.antchain.bridge.relayer.commons.constant.AuthMsgProcessStateEn
 import com.alipay.antchain.bridge.relayer.commons.constant.UpperProtocolTypeBeyondAMEnum;
 import com.alipay.antchain.bridge.relayer.commons.model.AuthMsgWrapper;
 import com.alipay.antchain.bridge.relayer.commons.model.SDPMsgCommitResult;
+import com.alipay.antchain.bridge.relayer.commons.model.SDPMsgWrapper;
 import com.alipay.antchain.bridge.relayer.commons.model.UniformCrosschainPacketContext;
 import com.alipay.antchain.bridge.relayer.core.manager.blockchain.IBlockchainManager;
 import com.alipay.antchain.bridge.relayer.core.manager.network.IRelayerNetworkManager;
+import com.alipay.antchain.bridge.relayer.core.service.report.PlatformReportClient;
 import com.alipay.antchain.bridge.relayer.dal.repository.ICrossChainMessageRepository;
 import com.alipay.antchain.bridge.relayer.dal.repository.IScheduleRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -40,8 +42,11 @@ public class AsyncReceiveHandler {
     @Resource
     private IRelayerNetworkManager relayerNetworkManager;
 
-    public void receiveUniformCrosschainPackets(List<UniformCrosschainPacketContext> ucpContexts) {
+    @Resource
+    private PlatformReportClient platformReportClient;
 
+
+    public void receiveUniformCrosschainPackets(List<UniformCrosschainPacketContext> ucpContexts) {
         int rowsNum = crossChainMessageRepository.putUniformCrosschainPackets(ucpContexts);
         if (ucpContexts.size() != rowsNum) {
             throw new RuntimeException(
@@ -52,6 +57,15 @@ public class AsyncReceiveHandler {
             );
         }
         log.info("put PENDING UCPs [ {} ] to pool success", ucpContexts.stream().map(UniformCrosschainPacketContext::getUcpId).reduce((s, s2) -> s + ", " + s2).orElse(""));
+
+        // External reporting must never precede the Relayer's own durable UCP record.
+        // PlatformReportClient contains all network/build failures, so the core receive path stays valid.
+        ucpContexts.stream()
+                .filter(context -> !context.isFromNetwork())
+                .forEach(context -> {
+
+                    platformReportClient.reportUcp(context);
+                });
     }
 
     public void receiveAuthMessages(List<AuthMsgWrapper> authMsgWrappers) {
@@ -95,6 +109,20 @@ public class AsyncReceiveHandler {
         if (commitResults.isEmpty()) {
             return true;
         }
+
+        commitResults.forEach(result -> {
+            if (!result.isConfirmed()) {
+                return;
+            }
+            SDPMsgWrapper message = crossChainMessageRepository.getSDPMessage(result.getTxHash());
+            if (ObjectUtil.isNotNull(message)) {
+                String ucpId = crossChainMessageRepository.getUcpId(message.getAuthMsgWrapper().getAuthMsgId());
+                platformReportClient.reportTargetChainExecution(
+                        ucpId,
+                        result
+                );
+            }
+        });
 
         List<Integer> results = transactionTemplate.execute(
                 status -> crossChainMessageRepository.updateSDPMessageResults(commitResults)

@@ -36,6 +36,17 @@ public class FISCOBCOSCompatibilityTest {
     }
 
     @Test
+    public void unsupportedRegulatoryCallsFailExplicitly() {
+        FISCOBCOSBBCService service = new FISCOBCOSBBCService();
+        Assert.assertThrows(UnsupportedOperationException.class, () -> service.setMonitorContract("ignored"));
+        Assert.assertThrows(UnsupportedOperationException.class, () -> service.setProtocolInMonitor("ignored"));
+        Assert.assertThrows(UnsupportedOperationException.class, () -> service.setMonitorControl(2));
+        Assert.assertThrows(UnsupportedOperationException.class, () -> service.setPtcHubInMonitorVerifier("ignored"));
+        Assert.assertThrows(UnsupportedOperationException.class,
+                () -> service.relayMonitorOrder("committee", "algorithm", null, null));
+    }
+
+    @Test
     public void shouldRetainExplicitAccountConfiguration() throws Exception {
         FISCOBCOSConfig config = FISCOBCOSConfig.fromJsonString(
                 "{\"accountFilePath\":\"/secure/account.pem\",\"accountPassword\":\"secret\"}");

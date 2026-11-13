@@ -101,6 +101,8 @@ docker run -itd --name redis-test -p 6379:6379 redis --requirepass 'YOUR_PWD' --
 
 在开始之前，需要初始化中继的数据库，这里提供一个[DDL](r-bootstrap/src/main/resources/db/ddl.sql)，或者解压之后在路径`config/db/ddl.sql`找到，在MySQL执行即可生成数据库`relayer`。
 
+已有数据库升级时，需要按版本执行[升级脚本](r-bootstrap/src/main/resources/db/upgrade/README.md)，再启动新版中继服务。
+
 #### TLS
 
 这里初始化中继的TLS证书，会在`tls_certs`路径下生成`relayer.crt`和`relayer.key`。

@@ -18,6 +18,10 @@ package com.alipay.antchain.bridge.ptc.committee.node.dal.repository;
 
 import java.math.BigInteger;
 import java.util.Comparator;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.List;
 
 import cn.hutool.core.collection.ListUtil;
@@ -28,6 +32,7 @@ import com.alipay.antchain.bridge.ptc.committee.node.commons.models.BtaWrapper;
 import com.alipay.antchain.bridge.ptc.committee.node.commons.models.TpBtaWrapper;
 import com.alipay.antchain.bridge.ptc.committee.node.commons.models.ValidatedConsensusStateWrapper;
 import com.alipay.antchain.bridge.ptc.committee.node.dal.convert.ConvertUtil;
+import com.alipay.antchain.bridge.ptc.committee.node.dal.utils.DioxideConsensusHash;
 import com.alipay.antchain.bridge.ptc.committee.node.dal.entities.BtaEntity;
 import com.alipay.antchain.bridge.ptc.committee.node.dal.entities.TpBtaEntity;
 import com.alipay.antchain.bridge.ptc.committee.node.dal.entities.ValidatedConsensusStatesEntity;
@@ -249,22 +254,55 @@ public class EndorseServiceRepositoryImpl implements IEndorseServiceRepository {
         }
     }
 
+    /** Product identity is authoritative; domain spelling and hash length are not. */
+    private boolean usesDioxideDigest(String domain) {
+        var registrations = btaMapper.selectList(new LambdaQueryWrapper<BtaEntity>()
+                .eq(BtaEntity::getDomain, domain));
+        if (registrations.isEmpty() || registrations.stream().anyMatch(
+                bta -> bta.getProduct() == null || bta.getProduct().isBlank())) {
+            throw new IllegalStateException("Missing BTA product for domain " + domain);
+        }
+        Set<String> products = registrations.stream()
+                .map(bta -> bta.getProduct().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        if (products.size() != 1) {
+            throw new IllegalStateException("Conflicting BTA products for domain " + domain);
+        }
+        return products.contains("dioxide2") || products.contains("dioxide");
+    }
+
     @Override
     public ValidatedConsensusStateWrapper getValidatedConsensusState(String domain, String hash) {
         try {
-            var entity = validatedConsensusStatesMapper.selectOne(
+            if (!usesDioxideDigest(domain)) {
+                var entity = validatedConsensusStatesMapper.selectOne(
+                        new LambdaQueryWrapper<ValidatedConsensusStatesEntity>()
+                                .eq(ValidatedConsensusStatesEntity::getDomain, domain)
+                                .eq(ValidatedConsensusStatesEntity::getHash, hash));
+                return entity == null ? null : ConvertUtil.convertFrom(entity);
+            }
+            byte[] original = DioxideConsensusHash.decode(hash);
+            String rawKey = java.util.HexFormat.of().formatHex(original);
+            String digestKey = DioxideConsensusHash.digest(original);
+            // Legacy rows remain readable during a staged migration, including on VARCHAR(64).
+            var candidates = validatedConsensusStatesMapper.selectList(
                     new LambdaQueryWrapper<ValidatedConsensusStatesEntity>()
                             .eq(ValidatedConsensusStatesEntity::getDomain, domain)
-                            .eq(ValidatedConsensusStatesEntity::getHash, hash)
-            );
-            if (ObjectUtil.isNull(entity)) {
+                            .and(q -> q.eq(ValidatedConsensusStatesEntity::getHash, digestKey)
+                                    .or().eq(ValidatedConsensusStatesEntity::getHash, rawKey)));
+            if (candidates.isEmpty()) {
                 return null;
             }
-            return ConvertUtil.convertFrom(entity);
+            if (candidates.size() != 1) {
+                throw new IllegalStateException("Conflicting consensus hash candidates for " + domain);
+            }
+            ValidatedConsensusStateWrapper result = ConvertUtil.convertFrom(candidates.getFirst());
+            if (!Arrays.equals(original, result.getValidatedConsensusState().getHash())) {
+                throw new IllegalStateException("Consensus lookup key disagrees with raw_vcs for " + domain);
+            }
+            return result;
         } catch (Exception e) {
             throw new DataAccessLayerException(
-                    e, "Failed to get validated consensus state for domain {} and hash {}", domain, hash
-            );
+                    e, "Failed to get validated consensus state for domain {} and hash {}", domain, hash);
         }
     }
 
@@ -274,7 +312,13 @@ public class EndorseServiceRepositoryImpl implements IEndorseServiceRepository {
             if (hasValidatedConsensusState(validatedConsensusStateWrapper.getDomain(), validatedConsensusStateWrapper.getHeight())) {
                 throw new RuntimeException("validated consensus state already exists");
             }
-            validatedConsensusStatesMapper.insert((ValidatedConsensusStatesEntity) ConvertUtil.convertFrom(validatedConsensusStateWrapper));
+            ValidatedConsensusStatesEntity entity = ConvertUtil.convertFrom(validatedConsensusStateWrapper);
+            if (usesDioxideDigest(validatedConsensusStateWrapper.getDomain())) {
+                var original = validatedConsensusStateWrapper.getValidatedConsensusState();
+                entity.setHash(DioxideConsensusHash.digest(original.getHash()));
+                entity.setParentHash(DioxideConsensusHash.digest(original.getParentHash()));
+            }
+            validatedConsensusStatesMapper.insert(entity);
         } catch (Exception e) {
             throw new DataAccessLayerException(
                     e, "Failed to save validated consensus state for domain {} and height {}",

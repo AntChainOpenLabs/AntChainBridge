@@ -25,6 +25,7 @@ import com.alipay.antchain.bridge.commons.core.ptc.ThirdPartyBlockchainTrustAnch
 import com.alipay.antchain.bridge.commons.core.ptc.ThirdPartyProof;
 import com.alipay.antchain.bridge.commons.core.ptc.ValidatedConsensusState;
 import com.alipay.antchain.bridge.ptc.types.PtcFeatureDescriptor;
+import com.alipay.antchain.bridge.ptc.types.PTCVerifyCrossChainMessageResult;
 
 public interface IPTCService {
 
@@ -52,6 +53,27 @@ public interface IPTCService {
             ValidatedConsensusState validatedConsensusState,
             UniformCrosschainPacket ucp
     );
+
+    default PTCVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            ThirdPartyBlockchainTrustAnchor tpbta,
+            ValidatedConsensusState validatedConsensusState,
+            UniformCrosschainPacket ucp
+    ) {
+        return new PTCVerifyCrossChainMessageResult(
+                verifyCrossChainMessage(tpbta, validatedConsensusState, ucp),
+                "",
+                ""
+        );
+    }
+
+    default PTCVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            ThirdPartyBlockchainTrustAnchor tpbta,
+            ValidatedConsensusState validatedConsensusState,
+            UniformCrosschainPacket ucp,
+            String ucpId
+    ) {
+        return verifyCrossChainMessageWithResult(tpbta, validatedConsensusState, ucp);
+    }
 
     Set<String> querySupportedBlockchainProducts();
 

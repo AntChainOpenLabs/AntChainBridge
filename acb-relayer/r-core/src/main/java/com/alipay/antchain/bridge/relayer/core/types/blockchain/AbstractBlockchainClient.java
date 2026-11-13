@@ -8,6 +8,7 @@ import com.alipay.antchain.bridge.commons.core.base.CrossChainMessageReceipt;
 import com.alipay.antchain.bridge.commons.core.rcc.ReliableCrossChainMessage;
 import com.alipay.antchain.bridge.relayer.commons.model.BlockchainMeta;
 import com.alipay.antchain.bridge.relayer.core.manager.bbc.IAMClientContract;
+import com.alipay.antchain.bridge.relayer.core.manager.bbc.IMonitorClientContract;
 import com.alipay.antchain.bridge.relayer.core.manager.bbc.IPtcContract;
 import com.alipay.antchain.bridge.relayer.core.manager.bbc.ISDPMsgClientContract;
 import lombok.AllArgsConstructor;
@@ -40,6 +41,8 @@ public abstract class AbstractBlockchainClient {
     public abstract IAMClientContract getAMClientContract();
 
     public abstract ISDPMsgClientContract getSDPMsgClientContract();
+
+    public abstract IMonitorClientContract getMonitorClientContract();
 
     public abstract IPtcContract getPtcContract();
 

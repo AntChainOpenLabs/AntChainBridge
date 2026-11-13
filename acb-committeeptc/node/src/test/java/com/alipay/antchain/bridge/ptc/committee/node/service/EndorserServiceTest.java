@@ -280,7 +280,7 @@ public class EndorserServiceTest extends TestBase {
         var hcdvs = mock(IHeteroChainDataVerifierService.class);
         when(hcdvs.verifyAnchorConsensusState(any(), any())).thenReturn(VerifyResult.builder().success(true).build());
         when(endorseServiceRepository.getMatchedTpBta(any())).thenReturn(new TpBtaWrapper(tpbta));
-        when(endorseServiceRepository.getBta(anyString())).thenReturn(new BtaWrapper(bta));
+        when(endorseServiceRepository.getBta(anyString(), anyInt())).thenReturn(new BtaWrapper(bta));
         when(hcdvsPluginService.getHCDVSService(anyString())).thenReturn(hcdvs);
 
         var vcs = BeanUtil.copyProperties(anchorState, ValidatedConsensusStateV1.class);
@@ -312,8 +312,8 @@ public class EndorserServiceTest extends TestBase {
         var hcdvs = mock(IHeteroChainDataVerifierService.class);
         when(hcdvs.verifyConsensusState(any(), any())).thenReturn(VerifyResult.builder().success(true).build());
         when(endorseServiceRepository.getMatchedTpBta(any())).thenReturn(new TpBtaWrapper(tpbta));
-        when(endorseServiceRepository.getBta(anyString())).thenReturn(new BtaWrapper(bta));
-        when(endorseServiceRepository.getValidatedConsensusState(anyString(), anyString())).thenReturn(new ValidatedConsensusStateWrapper(vcs));
+        when(endorseServiceRepository.getBta(anyString(), anyInt())).thenReturn(new BtaWrapper(bta));
+        when(endorseServiceRepository.getValidatedConsensusState(anyString(), any(BigInteger.class))).thenReturn(new ValidatedConsensusStateWrapper(vcs));
         when(hcdvsPluginService.getHCDVSService(anyString())).thenReturn(hcdvs);
 
         var vcsSigned = endorserService.commitConsensusState(crossChainLane, currState);
@@ -336,7 +336,7 @@ public class EndorserServiceTest extends TestBase {
         when(hcdvs.verifyCrossChainMessage(any(), any())).thenReturn(VerifyResult.builder().success(true).build());
         when(hcdvs.parseMessageFromLedgerData(any())).thenReturn(ucp.getSrcMessage().getMessage());
         when(endorseServiceRepository.getExactTpBta(any())).thenReturn(new TpBtaWrapper(tpbta));
-        when(endorseServiceRepository.getBta(anyString())).thenReturn(new BtaWrapper(bta));
+        when(endorseServiceRepository.getBta(anyString(), anyInt())).thenReturn(new BtaWrapper(bta));
         when(endorseServiceRepository.getValidatedConsensusState(anyString(), anyString())).thenReturn(new ValidatedConsensusStateWrapper(currVcs));
         when(hcdvsPluginService.getHCDVSService(anyString())).thenReturn(hcdvs);
 
@@ -354,6 +354,43 @@ public class EndorserServiceTest extends TestBase {
                         ).getEncodedToSign()
                 )
         );
+    }
+
+    @Test
+    public void testDioxide2SkipsHcdvsButKeepsSignedStateAndProof() {
+        BlockchainTrustAnchorV1 dioxideBta = BeanUtil.copyProperties(bta, BlockchainTrustAnchorV1.class);
+        dioxideBta.setSubjectProduct("dioxide2");
+        BtaWrapper dioxideBtaWrapper = new BtaWrapper(dioxideBta);
+
+        when(endorseServiceRepository.getMatchedTpBta(any())).thenReturn(new TpBtaWrapper(tpbta));
+        when(endorseServiceRepository.getExactTpBta(any())).thenReturn(new TpBtaWrapper(tpbta));
+        when(endorseServiceRepository.getBta(anyString(), anyInt())).thenReturn(dioxideBtaWrapper);
+
+        ValidatedConsensusStateV1 anchorVcs = BeanUtil.copyProperties(anchorState, ValidatedConsensusStateV1.class);
+        when(endorseServiceRepository.getValidatedConsensusState(anyString(), any(BigInteger.class)))
+                .thenReturn(new ValidatedConsensusStateWrapper(anchorVcs));
+
+        var signedAnchor = endorserService.commitAnchorState(crossChainLane, anchorState);
+        Assert.assertNotNull(signedAnchor.getPtcProof());
+
+        var signedConsensus = endorserService.commitConsensusState(crossChainLane, currState);
+        Assert.assertNotNull(signedConsensus.getPtcProof());
+
+        CommitteeNodeProof nodeProof = endorserService.verifyUcp(crossChainLane, ucp);
+        Assert.assertTrue(
+                new TpBtaWrapper(tpbta).getEndorseRoot().check(
+                        CommitteeEndorseProof.builder()
+                                .committeeId(committeeId)
+                                .sigs(ListUtil.toList(nodeProof))
+                                .build(),
+                        ThirdPartyProof.create(
+                                tpbta.getTpbtaVersion(),
+                                ucp.getSrcMessage().getMessage(),
+                                crossChainLane
+                        ).getEncodedToSign()
+                )
+        );
+        verify(hcdvsPluginService, never()).getHCDVSService(anyString());
     }
 
     @Test
