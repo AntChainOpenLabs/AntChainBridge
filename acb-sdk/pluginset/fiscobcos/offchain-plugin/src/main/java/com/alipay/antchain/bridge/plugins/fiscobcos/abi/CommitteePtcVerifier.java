@@ -59,51 +59,51 @@ public class CommitteePtcVerifier extends Contract {
     }
 
     public BigInteger myPtcType() throws ContractException {
-        final Function function = new Function(FUNC_MYPTCTYPE, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_MYPTCTYPE,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
         return executeCallWithSingleValueReturn(function, BigInteger.class);
     }
 
     public Function getMethodMyPtcTypeRawFunction() throws ContractException {
-        final Function function = new Function(FUNC_MYPTCTYPE, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_MYPTCTYPE,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
         return function;
     }
 
     public TransactionReceipt verifyTpBta(PTCVerifyAnchor va, TpBta tpBta) {
         final Function function = new Function(
-                FUNC_VERIFYTPBTA, 
-                Arrays.<Type>asList(va, 
-                tpBta), 
+                FUNC_VERIFYTPBTA,
+                Arrays.<Type>asList(va,
+                tpBta),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodVerifyTpBtaRawFunction(PTCVerifyAnchor va, TpBta tpBta) throws
             ContractException {
-        final Function function = new Function(FUNC_VERIFYTPBTA, 
-                Arrays.<Type>asList(va, 
-                tpBta), 
+        final Function function = new Function(FUNC_VERIFYTPBTA,
+                Arrays.<Type>asList(va,
+                tpBta),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return function;
     }
 
     public String getSignedTransactionForVerifyTpBta(PTCVerifyAnchor va, TpBta tpBta) {
         final Function function = new Function(
-                FUNC_VERIFYTPBTA, 
-                Arrays.<Type>asList(va, 
-                tpBta), 
+                FUNC_VERIFYTPBTA,
+                Arrays.<Type>asList(va,
+                tpBta),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String verifyTpBta(PTCVerifyAnchor va, TpBta tpBta, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_VERIFYTPBTA, 
-                Arrays.<Type>asList(va, 
-                tpBta), 
+                FUNC_VERIFYTPBTA,
+                Arrays.<Type>asList(va,
+                tpBta),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
@@ -111,21 +111,21 @@ public class CommitteePtcVerifier extends Contract {
     public Tuple2<PTCVerifyAnchor, TpBta> getVerifyTpBtaInput(
             TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_VERIFYTPBTA, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_VERIFYTPBTA,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<PTCVerifyAnchor>() {}, new TypeReference<TpBta>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple2<PTCVerifyAnchor, TpBta>(
 
-                (PTCVerifyAnchor) results.get(0), 
+                (PTCVerifyAnchor) results.get(0),
                 (TpBta) results.get(1)
                 );
     }
 
     public Tuple1<Boolean> getVerifyTpBtaOutput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getOutput();
-        final Function function = new Function(FUNC_VERIFYTPBTA, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_VERIFYTPBTA,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<Boolean>(
@@ -136,27 +136,27 @@ public class CommitteePtcVerifier extends Contract {
 
     public TransactionReceipt verifyTpProof(TpBta tpBta, ThirdPartyProof tpProof) {
         final Function function = new Function(
-                FUNC_VERIFYTPPROOF, 
-                Arrays.<Type>asList(tpBta, 
-                tpProof), 
+                FUNC_VERIFYTPPROOF,
+                Arrays.<Type>asList(tpBta,
+                tpProof),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodVerifyTpProofRawFunction(TpBta tpBta, ThirdPartyProof tpProof) throws
             ContractException {
-        final Function function = new Function(FUNC_VERIFYTPPROOF, 
-                Arrays.<Type>asList(tpBta, 
-                tpProof), 
+        final Function function = new Function(FUNC_VERIFYTPPROOF,
+                Arrays.<Type>asList(tpBta,
+                tpProof),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return function;
     }
 
     public String getSignedTransactionForVerifyTpProof(TpBta tpBta, ThirdPartyProof tpProof) {
         final Function function = new Function(
-                FUNC_VERIFYTPPROOF, 
-                Arrays.<Type>asList(tpBta, 
-                tpProof), 
+                FUNC_VERIFYTPPROOF,
+                Arrays.<Type>asList(tpBta,
+                tpProof),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
@@ -164,9 +164,9 @@ public class CommitteePtcVerifier extends Contract {
     public String verifyTpProof(TpBta tpBta, ThirdPartyProof tpProof,
             TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_VERIFYTPPROOF, 
-                Arrays.<Type>asList(tpBta, 
-                tpProof), 
+                FUNC_VERIFYTPPROOF,
+                Arrays.<Type>asList(tpBta,
+                tpProof),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
@@ -174,21 +174,21 @@ public class CommitteePtcVerifier extends Contract {
     public Tuple2<TpBta, ThirdPartyProof> getVerifyTpProofInput(
             TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_VERIFYTPPROOF, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_VERIFYTPPROOF,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<TpBta>() {}, new TypeReference<ThirdPartyProof>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple2<TpBta, ThirdPartyProof>(
 
-                (TpBta) results.get(0), 
+                (TpBta) results.get(0),
                 (ThirdPartyProof) results.get(1)
                 );
     }
 
     public Tuple1<Boolean> getVerifyTpProofOutput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getOutput();
-        final Function function = new Function(FUNC_VERIFYTPPROOF, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_VERIFYTPPROOF,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<Boolean>(

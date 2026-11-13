@@ -46,4 +46,12 @@ public interface IAMWriter {
      * @return {@link CrossChainMessageReceipt}
      */
     CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage);
+
+    /**
+     * Stable caller identity for durable submission. Legacy plugins retain their existing behavior.
+     * Implementations must not derive this identity from the (possibly identical) business payload.
+     */
+    default CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage, String submissionId) {
+        return relayAuthMessage(rawMessage);
+    }
 }

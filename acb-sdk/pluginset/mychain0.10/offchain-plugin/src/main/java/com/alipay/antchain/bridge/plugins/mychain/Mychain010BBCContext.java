@@ -4,7 +4,9 @@ import java.io.IOException;
 
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.annotation.JSONField;
 import com.alipay.antchain.bridge.commons.bbc.AbstractBBCContext;
+import com.alipay.antchain.bridge.commons.bbc.DefaultBBCContext;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.AuthMessageContract;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.ContractStatusEnum;
 import com.alipay.antchain.bridge.commons.bbc.syscontract.PTCContract;
@@ -25,14 +27,22 @@ public class Mychain010BBCContext extends AbstractBBCContext {
     private static final String EVM_CONTRACT_KEY = "evm";
     private static final String WASM_CONTRACT_KEY = "wasm";
 
+    @JSONField(serialize = false, deserialize = false)
     private AMContractClientEVM amContractClientEVM;
+    @JSONField(serialize = false, deserialize = false)
     private AMContractClientWASM amContractClientWASM;
+    @JSONField(serialize = false, deserialize = false)
     private AMContractClientTeeWASM amContractClientTeeWASM;
+    @JSONField(serialize = false, deserialize = false)
     private SDPContractClientEVM sdpContractClientEVM;
+    @JSONField(serialize = false, deserialize = false)
     private SDPContractClientWASM sdpContractClientWASM;
+    @JSONField(serialize = false, deserialize = false)
     private SDPContractClientTeeWASM sdpContractClientTeeWASM;
+    @JSONField(serialize = false, deserialize = false)
     private PtcContractEvm ptcContractEvm;
 
+    @JSONField(serialize = false, deserialize = false)
     private final Logger logger;
 
     // 可靠上链相关
@@ -69,6 +79,25 @@ public class Mychain010BBCContext extends AbstractBBCContext {
             this.setAmContractClientTeeWASM(((Mychain010BBCContext) context).getAmContractClientTeeWASM());
             this.setSdpContractClientTeeWASM(((Mychain010BBCContext) context).getSdpContractClientTeeWASM());
         }
+    }
+
+    /**
+     * Serialize the same portable fields as the Mychain 0.20 context.
+     *
+     * <p>Runtime clients must not cross the PluginServer boundary. Serializing
+     * this subclass directly lets bean getters such as getCommitteeVerifier()
+     * and getSupportedPTCTypes() perform chain reads. A plain context also
+     * avoids relying on plugin-local annotations across class loaders.</p>
+     */
+    @Override
+    public byte[] encodeToBytes() {
+        DefaultBBCContext persistedContext = new DefaultBBCContext();
+        persistedContext.setSdpContract(this.getSdpContract());
+        persistedContext.setPtcContract(this.getPtcContract());
+        persistedContext.setAuthMessageContract(this.getAuthMessageContract());
+        persistedContext.setReliable(this.isReliable());
+        persistedContext.setConfForBlockchainClient(this.getConfForBlockchainClient());
+        return persistedContext.encodeToBytes();
     }
 
     /**

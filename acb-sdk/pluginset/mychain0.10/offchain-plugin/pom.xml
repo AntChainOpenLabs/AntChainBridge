@@ -27,6 +27,24 @@
     </repositories>
 
     <dependencies>
+        <!-- Explicit production baseline; do not inherit versions from test dependencies. -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId><artifactId>protobuf-java</artifactId>
+            <version>3.5.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId><artifactId>commons-lang3</artifactId>
+            <version>3.8.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId>
+            <version>1.7.25</version>
+        </dependency>
+        <!-- Compile-time only: Java 21 compatible processor; never packaged. -->
+        <dependency>
+            <groupId>org.projectlombok</groupId><artifactId>lombok</artifactId>
+            <version>1.18.32</version><scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk18on</artifactId>
@@ -81,6 +99,11 @@
             <artifactId>committee-ptc-core</artifactId>
             <version>0.1.0-SNAPSHOT</version>
             <scope>test</scope>
+            <!-- Test-only gRPC must not mediate production SDK dependencies. -->
+            <exclusions>
+                <exclusion><groupId>com.google.guava</groupId><artifactId>guava</artifactId></exclusion>
+                <exclusion><groupId>com.google.protobuf</groupId><artifactId>protobuf-java</artifactId></exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
@@ -190,9 +213,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
+                    <!-- Preserve the deployed SDK's bundled classes before transitive fallbacks. -->
+                    <descriptors>
+                        <descriptor>src/assembly/plugin.xml</descriptor>
+                    </descriptors>
                     <finalName>${project.artifactId}-${project.version}-plugin</finalName>
                     <appendAssemblyId>false</appendAssemblyId>
                     <attach>false</attach>

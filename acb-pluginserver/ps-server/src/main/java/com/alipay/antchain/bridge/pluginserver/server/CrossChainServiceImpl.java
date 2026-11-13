@@ -362,7 +362,7 @@ public class CrossChainServiceImpl extends CrossChainServiceGrpc.CrossChainServi
 
     private Response handleRelayAuthMessage(IBBCService bbcService, RelayAuthMessageRequest request, String product, String domain) {
         try {
-            CrossChainMessageReceipt ret = bbcService.relayAuthMessage(request.getRawMessage().toByteArray());
+            CrossChainMessageReceipt ret = bbcService.relayAuthMessage(request.getRawMessage().toByteArray(), request.getSubmissionId());
             return ResponseBuilder.buildBBCSuccessResp(CallBBCResponse.newBuilder()
                     .setRelayAuthMessageResponse(RelayAuthMessageResponse.newBuilder()
                             .setReceipt(

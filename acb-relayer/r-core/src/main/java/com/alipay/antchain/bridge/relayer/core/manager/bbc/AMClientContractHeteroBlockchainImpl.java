@@ -24,7 +24,14 @@ public class AMClientContractHeteroBlockchainImpl implements IAMClientContract {
     @Override
     public SendResponseResult recvPkgFromRelayer(AuthMsgPackage pkg) {
         try {
-            CrossChainMessageReceipt receipt = bbcServiceClient.relayAuthMessage(pkg.extractProofs());
+            String submissionId = "";
+            if (pkg.getSdpMsgWrapper() != null && pkg.getSdpMsgWrapper().getAuthMsgWrapper() != null) {
+                String ucpId = pkg.getSdpMsgWrapper().getAuthMsgWrapper().getUcpId();
+                if (ucpId != null && !ucpId.isEmpty()) {
+                    submissionId = stableSubmissionId(ucpId, bbcServiceClient.getDomain());
+                }
+            }
+            CrossChainMessageReceipt receipt = bbcServiceClient.relayAuthMessage(pkg.extractProofs(), submissionId);
             if (ObjectUtil.isNull(receipt)) {
                 return new SendResponseResult(
                         "",
@@ -75,6 +82,10 @@ public class AMClientContractHeteroBlockchainImpl implements IAMClientContract {
     @Override
     public void setProtocol(String protocolContract, String protocolType) {
         this.bbcServiceClient.setProtocol(protocolContract, protocolType);
+    }
+
+    static String stableSubmissionId(String ucpId, String domain) {
+        return cn.hutool.crypto.digest.DigestUtil.sha256Hex("relay-am|" + ucpId + "|" + domain);
     }
 
     @Override

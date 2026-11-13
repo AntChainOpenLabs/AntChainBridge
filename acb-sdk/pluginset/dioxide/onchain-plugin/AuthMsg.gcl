@@ -53,20 +53,6 @@ contract AuthMsg implements IAuthMessage.AuthMessageInterface {
             relay@external SubProtocolUpdate(protocolType, protocolID, protocolAddress);
             __debug.print("[Event] SubProtocolUpdate - type:", protocolType, " id:", protocolID, " address:", protocolAddress);
         }
-
-        array<uint8> test;
-        test.push(100u8);
-        test.push(101u8);
-        test.push(102u8);
-        test.push(103u8);
-        test.push(104u8);
-        test.push(1u8);
-        test.push(2u8);
-        test.push(30u8);
-        test.push(40u8);
-        relay@global (^test) {
-            relay@external testEvent(test);
-        }
     }
 
     @global function recvFromProtocol(uint64 senderID, array<uint8> message) public export {

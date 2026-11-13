@@ -134,6 +134,7 @@ message SetPtcContractRequest {
 
 message RelayAuthMessageRequest {
   bytes rawMessage = 1;
+  string submissionId = 2;
 }
 
 message SetAmContractRequest {

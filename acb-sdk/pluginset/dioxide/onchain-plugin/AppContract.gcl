@@ -1,6 +1,9 @@
 import IContractUsingSDP;
 import ISDPMessage;
 
+// Compatibility fixture: persistent arrays in this schema retain backing
+// bytes after shrinking. Use AppContractV2 for exact latest-payload checks;
+// do not add global fields to this deployed contract name in place.
 contract AppContract implements IContractUsingSDP.ContractUsingSDPInterface {
 
     // 消息列表结构 - 用于存储多条消息

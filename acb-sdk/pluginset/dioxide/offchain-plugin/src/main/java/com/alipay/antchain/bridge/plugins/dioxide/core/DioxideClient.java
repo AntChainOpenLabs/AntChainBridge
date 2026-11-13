@@ -5,7 +5,6 @@ import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.digest.DigestUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -22,10 +21,12 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import lombok.Getter;
+import com.alipay.antchain.bridge.plugins.lib.transactions.JdbcTransactionCoordinator;
 import lombok.SneakyThrows;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
@@ -53,6 +54,24 @@ public class DioxideClient {
 
     private final ExecutorService executor;
 
+    private volatile JdbcTransactionCoordinator transactionCoordinator;
+    private long coordinatorCheckpointHeight;
+
+    @SneakyThrows
+    private synchronized JdbcTransactionCoordinator coordinator() {
+        if (transactionCoordinator == null) {
+            String filename = config.getTxCoordinatorConfigFile();
+            if (StrUtil.isEmpty(filename)) {
+                filename = System.getProperty("dioxide.tx.config", System.getenv("DIOXIDE_TX_COORDINATOR_CONFIG"));
+                if (StrUtil.isEmpty(filename)) { filename = "/etc/antchain-bridge/dioxide-tx.properties"; }
+            }
+            Properties p = JdbcTransactionCoordinator.readConfig(filename);
+            coordinatorCheckpointHeight = Long.parseLong(JdbcTransactionCoordinator.required(p, "checkpointHeight"));
+            transactionCoordinator = JdbcTransactionCoordinator.fromProperties(p, getClass().getClassLoader());
+        }
+        return transactionCoordinator;
+    }
+
     private static final int DEFAULT_TIMEOUT = 20 * 1000;
 
     private static final List<String> PRE_CONTRACT_ORDER = List.of(
@@ -72,6 +91,8 @@ public class DioxideClient {
     private static final String SEND_AUTH_MESSAGE_EVENT_NAME = "SendAuthMessage:name";
 
     private static final String RECV_MESSAGE_IN_PROTOCOL = "recvMessageInProtocol:name";
+
+    private static final String INVOCATION_SUCCESS = "IVKRET_SUCCESS";
 
     public DioxideClient(DioxideConfig config, Logger bbcLogger) {
         this.bbcLogger = bbcLogger;
@@ -149,81 +170,158 @@ public class DioxideClient {
     }
 
     public CrossChainMessageReceipt getCrossChainMessageReceipt(DioxideTransaction dioxideTransaction) {
-        CrossChainMessageReceipt crossChainMessageReceipt = new CrossChainMessageReceipt();
-        // check if tx0 is null
         if (dioxideTransaction == null) {
-            crossChainMessageReceipt.setConfirmed(false);
-            crossChainMessageReceipt.setSuccessful(false);
-            crossChainMessageReceipt.setTxhash("");
-            crossChainMessageReceipt.setErrorMsg("tx0 is null");
-            return crossChainMessageReceipt;
+            return buildCrossChainMessageReceipt(null, false, false, "tx0 is null");
         }
 
-        // check if tx0 is confirmed
-        Long currHeight = queryLatestHeight();
-        if (dioxideTransaction.getHeight() == null || dioxideTransaction.getHeight().compareTo(currHeight) > 0) {
-            crossChainMessageReceipt.setConfirmed(false);
-            crossChainMessageReceipt.setSuccessful(true);
-            crossChainMessageReceipt.setTxhash(dioxideTransaction.getTxHash());
-            crossChainMessageReceipt.setErrorMsg("tx0 is not confirmed");
-            return crossChainMessageReceipt;
+        TxFinalityResult txFinalityResult = evaluateTxFinalityWithRelays(dioxideTransaction);
+        if (txFinalityResult.state() == TxFinalityState.FAILED) {
+            return buildCrossChainMessageReceipt(
+                    dioxideTransaction,
+                    true,
+                    false,
+                    String.format(
+                            "transaction %s reached terminal failure state %s",
+                            txFinalityResult.txHash(),
+                            txFinalityResult.confirmState()
+                    )
+            );
+        }
+        if (txFinalityResult.state() == TxFinalityState.PENDING) {
+            return buildCrossChainMessageReceipt(
+                    dioxideTransaction,
+                    false,
+                    true,
+                    String.format(
+                            "transaction %s is not finalized (state: %s)",
+                            StrUtil.emptyToDefault(txFinalityResult.txHash(), "unknown"),
+                            StrUtil.emptyToDefault(txFinalityResult.confirmState(), "unknown")
+                    )
+            );
         }
 
-        // check if tx1(inbound relay) in tx0 is confirmed
+        // A finalized tx0 may not have produced its inbound relay yet.
         if (dioxideTransaction.getInvocation() == null || CollUtil.isEmpty(dioxideTransaction.getInvocation().getRelays())) {
-            crossChainMessageReceipt.setConfirmed(false);
-            crossChainMessageReceipt.setSuccessful(true);
-            crossChainMessageReceipt.setTxhash(dioxideTransaction.getTxHash());
-            crossChainMessageReceipt.setErrorMsg("tx1(inbound relay) in tx0 is not confirmed");
-            return crossChainMessageReceipt;
+            return buildCrossChainMessageReceipt(
+                    dioxideTransaction,
+                    false,
+                    true,
+                    "tx1(inbound relay) in tx0 is not available"
+            );
         }
 
-        // check if tx2(contain recvMessageInProtocol event txHash) in tx1 is confirmed and successful
         List<String> tx2Hashes = dioxideTransaction.getInvocation().getRelays().stream()
                 .filter(Objects::nonNull)
-                .map(s -> {
-                    int idx = s.indexOf(':');
-                    return idx >= 0 ? s.substring(0, idx) : s;
-                })
+                .filter(StrUtil::isNotEmpty)
                 .distinct()
                 .toList();
+
+        boolean eventStructurePending = false;
+        List<String> eventTargetTxHashes = new ArrayList<>();
+        Map<String, JSONObject> relayGroups = new HashMap<>();
         for (String tx2Hash : tx2Hashes) {
-            JSONObject tx2 = getTransactionJonObjectByHash(tx2Hash);
-            // check if tx3 (is recvMessageInProtocol event tx) in tx2 is confirmed and successful
-            JSONArray eventRelays = tx2.getJSONArray("Relays");
-            if (CollUtil.isEmpty(eventRelays)) {
-                crossChainMessageReceipt.setConfirmed(false);
-                crossChainMessageReceipt.setSuccessful(true);
-                crossChainMessageReceipt.setTxhash(dioxideTransaction.getTxHash());
-                crossChainMessageReceipt.setErrorMsg("recvMessageInProtocol event in protocol contract is not confirmed");
-                return crossChainMessageReceipt;
+            String groupHash = normalizeRelayTxHash(tx2Hash);
+            if (!relayGroups.containsKey(groupHash)) {
+                relayGroups.put(groupHash, getTransactionJonObjectByHash(groupHash));
             }
-            List<DioxideTransaction> eventTxs = eventRelays.toJavaList(DioxideTransaction.class);
-            for (DioxideTransaction eventTx : eventTxs) {
-                if (eventTx.getInvocation() != null && CollUtil.isNotEmpty(eventTx.getInvocation().getRelays())) {
-                    // find recvMessageInProtocol event
-                    List<String> tx3Hashes = eventTx.getInvocation().getRelays();
-                    for (String tx3Hash : tx3Hashes) {
-                        DioxideTransaction dtx = getTransactionByHash(tx3Hash);
-                        if (dtx != null && StrUtil.isNotEmpty(dtx.getTarget()) && dtx.getTarget().equals(DioxideClient.RECV_MESSAGE_IN_PROTOCOL)) {
-                            crossChainMessageReceipt.setConfirmed(true);
-                            crossChainMessageReceipt.setSuccessful(true);
-                            crossChainMessageReceipt.setTxhash(dioxideTransaction.getTxHash());
-                            crossChainMessageReceipt.setErrorMsg("");
-                            return crossChainMessageReceipt;
-                        }
-                    }
+            JSONObject tx2 = scopeRelayGroup(relayGroups.get(groupHash), tx2Hash);
+            RelayEventInspection relayEventInspection = inspectRelayEvents(tx2, tx2Hash);
+            if (relayEventInspection.state() == RelayEventState.FAILED) {
+                return buildCrossChainMessageReceipt(
+                        dioxideTransaction,
+                        true,
+                        false,
+                        relayEventInspection.errorMessage()
+                );
+            }
+            eventStructurePending |= relayEventInspection.state() == RelayEventState.PENDING;
+            eventTargetTxHashes.addAll(relayEventInspection.eventTargetTxHashes());
+        }
+
+        TxFinalityResult pendingEventFinality = eventStructurePending
+                ? new TxFinalityResult(TxFinalityState.PENDING, "", "")
+                : null;
+        List<DioxideTransaction> eventTargetTxs = new ArrayList<>();
+        for (String eventTargetTxHash : eventTargetTxHashes.stream().distinct().toList()) {
+            DioxideTransaction eventTargetTx = scopeTransactionReference(
+                    getTransactionByHash(normalizeRelayTxHash(eventTargetTxHash)), eventTargetTxHash);
+            if (eventTargetTx == null) {
+                if (pendingEventFinality == null) {
+                    pendingEventFinality = new TxFinalityResult(
+                            TxFinalityState.PENDING,
+                            eventTargetTxHash,
+                            ""
+                    );
                 }
+                continue;
+            }
+            eventTargetTxs.add(eventTargetTx);
+            TxFinalityResult eventTargetFinality = evaluateTxFinalityWithRelays(eventTargetTx);
+            if (eventTargetFinality.state() == TxFinalityState.FAILED) {
+                return buildCrossChainMessageReceipt(
+                        dioxideTransaction,
+                        true,
+                        false,
+                        String.format(
+                                "transaction %s reached terminal failure state %s",
+                                eventTargetFinality.txHash(),
+                                eventTargetFinality.confirmState()
+                        )
+                );
+            }
+            if (eventTargetFinality.state() == TxFinalityState.PENDING && pendingEventFinality == null) {
+                pendingEventFinality = eventTargetFinality;
             }
         }
 
-        // not find recvMessageInProtocol event: tx is confirmed but failed?
-        crossChainMessageReceipt.setConfirmed(true);
-        crossChainMessageReceipt.setSuccessful(false);
-        crossChainMessageReceipt.setTxhash(dioxideTransaction.getTxHash());
-        crossChainMessageReceipt.setErrorMsg("no recvMessageInProtocol event is protocol contract");
+        if (pendingEventFinality != null) {
+            return buildCrossChainMessageReceipt(
+                    dioxideTransaction,
+                    false,
+                    true,
+                    String.format(
+                            "transaction %s is not finalized (state: %s)",
+                            StrUtil.emptyToDefault(pendingEventFinality.txHash(), "unknown"),
+                            StrUtil.emptyToDefault(pendingEventFinality.confirmState(), "unknown")
+                    )
+            );
+        }
 
-        return crossChainMessageReceipt;
+        for (DioxideTransaction eventTargetTx : eventTargetTxs) {
+            if (StrUtil.equals(eventTargetTx.getTarget(), RECV_MESSAGE_IN_PROTOCOL)) {
+                return buildCrossChainMessageReceipt(dioxideTransaction, true, true, "");
+            }
+        }
+
+        return buildCrossChainMessageReceipt(
+                dioxideTransaction,
+                true,
+                false,
+                "no recvMessageInProtocol event in protocol contract"
+        );
+    }
+
+    private CrossChainMessageReceipt buildCrossChainMessageReceipt(
+            DioxideTransaction dioxideTransaction,
+            boolean confirmed,
+            boolean successful,
+            String errorMsg
+    ) {
+        CrossChainMessageReceipt receipt = new CrossChainMessageReceipt();
+        receipt.setConfirmed(confirmed);
+        receipt.setSuccessful(successful);
+        receipt.setTxhash(dioxideTransaction == null ? "" : StrUtil.nullToEmpty(dioxideTransaction.getTxHash()));
+        receipt.setErrorMsg(StrUtil.nullToEmpty(errorMsg));
+        if (confirmed && dioxideTransaction != null) {
+            try {
+                coordinator().recordOutcome(dioxideTransaction.getTxHash(), successful);
+            } catch (Exception e) {
+                // The on-chain receipt remains authoritative; a journal outage cannot change its outcome.
+                getBbcLogger().warn("Could not update Dioxide submission outcome for {} ({})",
+                        dioxideTransaction.getTxHash(), e.getClass().getSimpleName());
+            }
+        }
+        return receipt;
     }
 
 
@@ -243,15 +341,16 @@ public class DioxideClient {
             dispatchedAndOutboundRelays.forEach(txn -> {
                 DioxideTransaction dtx = getTransactionByHash(txn);
                 if (StrUtil.isNotEmpty(dtx.getTarget())) {
-                    if (dtx.getTarget().equals(SEND_AUTH_MESSAGE_EVENT_NAME)) {
-                        getBbcLogger().info("send am event found in global shard, block: {}, block hash: {}, contract name: {}",
-                                block.getHeight(), block.getHash(), String.format("%s:%s", config.getDappName(), config.getAmContractName()));
+                    if (dtx.getTarget().equals(SEND_AUTH_MESSAGE_EVENT_NAME) &&
+                        StrUtil.contains(dtx.getFunction(), config.getDappName())) {
+                        getBbcLogger().info("send am event found in global shard, block: {}, block hash: {}, tx hash: {} contract name: {}",
+                                block.getHeight(), block.getHash(), dtx.getTxHash(), String.format("%s:%s", config.getDappName(), config.getAmContractName()));
                         messageList.add(CrossChainMessage.createCrossChainMessage(
                                 CrossChainMessage.CrossChainMessageType.AUTH_MSG,
                                 dtx.getHeight(),
                                 getConsensusHeaderByHeight(height).getLongValue("Timestamp"),
-                                // NOTICE: use sha256 to ensure this blockHash have 32 bytes
-                                DigestUtil.sha256(block.getHash()),
+                                // Store the original Dioxide block hash reversibly: relayer will hex-encode these UTF-8 bytes.
+                                block.getHash().getBytes(StandardCharsets.UTF_8),
                                 // todo: parse the am msg
                                 deserializedSendMsgEventArgs(dtx.getInputAsString()),
                                 // todo: put ledger data, for SPV or other attestations
@@ -260,10 +359,8 @@ public class DioxideClient {
                                 // todo: put proof data
                                 // this time we need no proof data. it's ok to set it with empty bytes
                                 "".getBytes(),
-                                // NOTICE: use sha256 to ensure this txHash have 32 bytes
-                                DigestUtil.sha256(dtx.getTxHash())
-//                                dtx.getTxHash().getBytes(StandardCharsets.UTF_8)
-
+                                // Store the original Dioxide tx hash reversibly: relayer will hex-encode these UTF-8 bytes.
+                                dtx.getTxHash().getBytes(StandardCharsets.UTF_8)
                         ));
                     }
                 }
@@ -484,7 +581,43 @@ public class DioxideClient {
         return resp.getLongValue("ContractVersionID");
     }
 
+    public boolean isContractVersionCurrent(String contractName, String configuredContractCid) {
+        if (StrUtil.isEmpty(configuredContractCid)) {
+            return false;
+        }
+        long currentCid = getContractCid(contractName);
+        if (!contractVersionMatches(configuredContractCid, currentCid)) {
+            getBbcLogger().warn(
+                    "stale or invalid Dioxide contract context for {}.{}: configured CID {}, current CID {}",
+                    config.getDappName(),
+                    contractName,
+                    configuredContractCid,
+                    currentCid
+            );
+            return false;
+        }
+        return true;
+    }
+
+    static boolean contractVersionMatches(String configuredContractCid, long currentCid) {
+        try {
+            return Long.parseLong(configuredContractCid) == currentCid;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     public long querySdpSeq(String senderDomain, String senderID, String receiverDomain, String receiverID) {
+        try {
+            return coordinator().withQueryLock(
+                    config.getDappName() + "." + config.getSdpContractName() + "|" + dioxideAccount.getAddressInString(),
+                    () -> querySdpSeqLocked(senderDomain, senderID, receiverDomain, receiverID));
+        } catch (Exception e) {
+            throw new RuntimeException("coordinated SDP sequence query failed", e);
+        }
+    }
+
+    private long querySdpSeqLocked(String senderDomain, String senderID, String receiverDomain, String receiverID) {
         try {
             int[] senderDomainArray = toIntArray(senderDomain.getBytes(StandardCharsets.UTF_8));
             int[] senderIDArray = toIntArray(HexUtil.decodeHex(senderID));
@@ -529,6 +662,25 @@ public class DioxideClient {
         long protocolCid = Long.parseLong(protocolCidInString);
         String protocolAddress = String.format("0x%016X:contract", protocolCid);
 
+        // Registration rechecks predeployed AM/SDP bindings. Do not submit the
+        // same setProtocol twice: the contract intentionally rejects duplicates.
+        JSONObject state = getContractState(config.getDappName(), config.getAmContractName(),
+                DioxideTypes.Scope.Global, "").getJSONObject("State");
+        if (state == null) {
+            throw new IllegalStateException("missing AuthMsg state before protocol binding");
+        }
+        JSONObject ids = state.getJSONObject("protocolIDs");
+        JSONObject routes = state.getJSONObject("protocolRoutes");
+        if ((ids != null && ids.containsKey(protocolType))
+                || (routes != null && routes.containsKey(protocolType))) {
+            if (ids != null && routes != null
+                    && Long.toString(protocolCid).equals(ids.getString(protocolType))
+                    && protocolAddress.equalsIgnoreCase(routes.getString(protocolType))) {
+                return;
+            }
+            throw new IllegalStateException("conflicting AuthMsg protocol binding for type " + protocolType);
+        }
+
         try {
             String txHash = sendTransaction(
                     JSON.toJSONString(orderedMap(
@@ -560,8 +712,10 @@ public class DioxideClient {
         }
     }
 
-    // NOTICE: 1.sync send tx, 2.truncate txHash to 32 bytes(temporary solution)
-    public CrossChainMessageReceipt relayMsgToAuthMsg(byte[] rawMessage) {
+    public CrossChainMessageReceipt relayMsgToAuthMsg(byte[] rawMessage, String submissionId) {
+        if (StrUtil.isEmpty(submissionId)) {
+            throw new IllegalArgumentException("Dioxide relay requires a stable submissionId; upgrade the Relayer and Plugin Server");
+        }
         try {
             String txHash = sendTransaction(
                     JSON.toJSONString(orderedMap(
@@ -569,8 +723,9 @@ public class DioxideClient {
                     "function", String.format("%s.%s.%s",config.getDappName(), config.getAmContractName(), "recvPkgFromRelayer"),
                     "args",  orderedMap(
                             "pkg", toIntArray(rawMessage)
-                    ))),
-                    true
+                    ),
+                    "gaslimit", 50000000)),
+                    false, submissionId
             );
 
             if (StrUtil.isEmpty(txHash)) {
@@ -578,10 +733,9 @@ public class DioxideClient {
             }
 
             CrossChainMessageReceipt crossChainMessageReceipt = new CrossChainMessageReceipt();
-            crossChainMessageReceipt.setConfirmed(true);
+            crossChainMessageReceipt.setConfirmed(false);
             crossChainMessageReceipt.setSuccessful(true);
-            // NOTICE: use sha256 to ensure txHash have 32 bytes
-            crossChainMessageReceipt.setTxhash(DigestUtil.sha256Hex(txHash));
+            crossChainMessageReceipt.setTxhash(txHash);
             crossChainMessageReceipt.setErrorMsg("");
             getBbcLogger().info("relay am msg by tx {}", txHash);
 
@@ -589,9 +743,7 @@ public class DioxideClient {
 
         } catch (Exception e) {
             throw new RuntimeException(
-                    String.format("failed to relay AM %s to %s",
-                            HexUtil.encodeHexStr(rawMessage), config.getAmContractName()
-                    ), e
+                    "failed to relay AM to " + config.getAmContractName(), e
             );
         }
     }
@@ -599,6 +751,19 @@ public class DioxideClient {
     public void setAmContractToSdp(String amContractCidInString) {
         long amContractCid = Long.parseLong(amContractCidInString);
         String amContractAddress = String.format("0x%016X:contract", amContractCid);
+
+        JSONObject current = getContractState(config.getDappName(), config.getSdpContractName(),
+                DioxideTypes.Scope.Global, "").getJSONObject("State");
+        if (current == null) {
+            throw new IllegalStateException("missing SDP state before AM binding");
+        }
+        if (current.getLongValue("amContractId") != 0L) {
+            if (current.getLongValue("amContractId") == amContractCid
+                    && amContractAddress.equalsIgnoreCase(current.getString("amAddress"))) {
+                return;
+            }
+            throw new IllegalStateException("conflicting SDP AM binding");
+        }
 
         try {
             String txHash = sendTransaction(
@@ -629,6 +794,23 @@ public class DioxideClient {
     }
 
     public void setLocalDomainToSdp(String localDomain) {
+        JSONObject current = getContractState(config.getDappName(), config.getSdpContractName(),
+                DioxideTypes.Scope.Global, "").getJSONObject("State");
+        if (current == null) {
+            throw new IllegalStateException("missing SDP state before domain binding");
+        }
+        JSONArray existing = current.getJSONArray("localDomain");
+        if (existing != null && existing.size() == localDomain.getBytes(StandardCharsets.UTF_8).length) {
+            byte[] expected = localDomain.getBytes(StandardCharsets.UTF_8);
+            boolean equal = true;
+            for (int i = 0; i < expected.length; i++) {
+                equal &= existing.getIntValue(i) == (expected[i] & 0xff);
+            }
+            if (equal) {
+                return;
+            }
+        }
+
         try {
             int[] domainArray = toIntArray(localDomain.getBytes(StandardCharsets.UTF_8));
             String txHash = sendTransaction(
@@ -720,7 +902,7 @@ public class DioxideClient {
     private List<JSONObject> getAllRelayTransactions(DioxideTransaction tx, boolean detail) {
         List<JSONObject> res = new ArrayList<>();
 
-        if (!isTxConfirmedWithRelays(tx)) {
+        if (evaluateTxFinalityWithRelays(tx).state() != TxFinalityState.FINALIZED) {
             return res;
         }
 
@@ -744,13 +926,13 @@ public class DioxideClient {
     }
 
     private boolean waitForTransactionConfirmed(String txHash, int timeOut) {
-        long start = System.currentTimeMillis();
-        DioxideTransaction dioxideTransaction = getTransactionByHash(txHash);
-
-        while (!isTxConfirmedWithRelays(dioxideTransaction)) {
-            if (System.currentTimeMillis() - start > timeOut) {
-                return false;
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(timeOut);
+        while (System.nanoTime() < deadline) {
+            TxFinalityResult result = evaluateTxFinalityWithRelays(getTransactionByHash(txHash));
+            if (result.state() == TxFinalityState.FAILED) {
+                throw new IllegalStateException("Dioxide transaction failed: " + result.txHash() + " (" + result.confirmState() + ")");
             }
+            if (result.state() == TxFinalityState.FINALIZED) { return true; }
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
@@ -758,43 +940,319 @@ public class DioxideClient {
                 return false;
             }
         }
-        return true;
-    }
-
-    private boolean isTxConfirmedWithRelays(DioxideTransaction dioxideTransaction) {
-        Queue<String> queue = new ArrayDeque<>();
-        queue.add(dioxideTransaction.getTxHash());
-        while (!queue.isEmpty()) {
-            String txHash = queue.poll();
-            DioxideTransaction curTx = getTransactionByHash(txHash);
-            if (!isTxConfirmed(curTx)) {
-                return false;
-            }
-            if (curTx.getInvocation() != null && curTx.getInvocation().getRelays() != null) {
-                queue.addAll(
-                        curTx.getInvocation().getRelays()
-                                .stream()
-                                .map(s -> s.split(":")[0])
-                                .toList()
-                );
-            }
-        }
-        return true;
+        return false;
     }
 
     public boolean isTxConfirmed(DioxideTransaction tx) {
-        if (tx == null || tx.getConfirmState() == null) {
+        if (tx == null) {
             return false;
         }
-        return DioxideTypes.TXN_CONFIRMED_STATUS.contains(tx.getConfirmState());
+        return (tx.getConfirmState() != null
+                && DioxideTypes.TXN_CONFIRMED_STATUS.contains(tx.getConfirmState()))
+                || isDurablyCommitted(tx);
+    }
+
+    public static boolean isTxFinalized(DioxideTransaction tx) {
+        if (tx == null) {
+            return false;
+        }
+        return (tx.getConfirmState() != null
+                && DioxideTypes.TXN_FINALIZED_STATUS.contains(tx.getConfirmState()))
+                || isDurablyCommitted(tx);
+    }
+
+    static boolean isTxTerminalFailed(DioxideTransaction tx) {
+        if (tx == null) {
+            return false;
+        }
+        return StrUtil.equalsAny(
+                tx.getConfirmState(),
+                DioxideTypes.TxnConfirmState.TXN_RELAY_INVALIDED.name(),
+                DioxideTypes.TxnConfirmState.TXN_ABORTED.name(),
+                DioxideTypes.TxnConfirmState.TXN_EXPIRED.name()
+        ) || StrUtil.equalsAny(
+                tx.getState(),
+                DioxideTypes.BlockState.DUS_INVALID.name(),
+                DioxideTypes.BlockState.DUS_FORKED.name(),
+                DioxideTypes.BlockState.DUS_ARCHIVED_UNCLE.name()
+        );
+    }
+
+    private static boolean isDurablyCommitted(DioxideTransaction tx) {
+        return StrUtil.equalsAny(
+                tx.getState(),
+                DioxideTypes.BlockState.DUS_FINALIZED.name(),
+                DioxideTypes.BlockState.DUS_ARCHIVED.name()
+        );
+    }
+
+    private TxFinalityResult evaluateTxFinalityWithRelays(DioxideTransaction dioxideTransaction) {
+        return evaluateTxFinalityWithRelays(dioxideTransaction, this::getTransactionByHash);
+    }
+
+    static TxFinalityResult evaluateTxFinalityWithRelays(
+            DioxideTransaction dioxideTransaction,
+            Function<String, DioxideTransaction> transactionResolver
+    ) {
+        if (dioxideTransaction == null) {
+            return new TxFinalityResult(TxFinalityState.PENDING, "", "");
+        }
+
+        Queue<DioxideTransaction> queue = new ArrayDeque<>();
+        Set<String> queuedTxHashes = new HashSet<>();
+        Map<String, DioxideTransaction> resolvedGroups = new HashMap<>();
+        queue.add(dioxideTransaction);
+        if (StrUtil.isNotEmpty(dioxideTransaction.getTxHash())) {
+            queuedTxHashes.add(normalizeRelayTxHash(dioxideTransaction.getTxHash()));
+        }
+
+        TxFinalityResult pendingResult = null;
+        while (!queue.isEmpty()) {
+            DioxideTransaction currentTx = queue.poll();
+            if (isTxTerminalFailed(currentTx)) {
+                return new TxFinalityResult(
+                        TxFinalityState.FAILED,
+                        currentTx.getTxHash(),
+                        currentTx.getConfirmState()
+                );
+            }
+            if (!isTxFinalized(currentTx) && pendingResult == null) {
+                pendingResult = new TxFinalityResult(
+                        TxFinalityState.PENDING,
+                        currentTx.getTxHash(),
+                        currentTx.getConfirmState()
+                );
+            }
+
+            List<String> relayReferences = new ArrayList<>();
+            String invocationFailure = collectInvocationReferences(currentTx, relayReferences);
+            if (invocationFailure != null) {
+                return new TxFinalityResult(TxFinalityState.FAILED, currentTx.getTxHash(), invocationFailure);
+            }
+            for (String relayTxReference : relayReferences) {
+                String relayTxHash = normalizeRelayTxHash(relayTxReference);
+                if (StrUtil.isEmpty(relayTxHash)) {
+                    if (pendingResult == null) {
+                        pendingResult = new TxFinalityResult(TxFinalityState.PENDING, "", "");
+                    }
+                    continue;
+                }
+                if (!queuedTxHashes.add(relayTxReference)) {
+                    continue;
+                }
+                if (!resolvedGroups.containsKey(relayTxHash)) {
+                    resolvedGroups.put(relayTxHash, transactionResolver.apply(relayTxHash));
+                }
+                DioxideTransaction relayTx = scopeTransactionReference(resolvedGroups.get(relayTxHash), relayTxReference);
+                if (relayTx == null) {
+                    if (pendingResult == null) {
+                        pendingResult = new TxFinalityResult(TxFinalityState.PENDING, relayTxHash, "");
+                    }
+                    continue;
+                }
+                queue.add(relayTx);
+            }
+        }
+
+        return pendingResult == null
+                ? new TxFinalityResult(
+                        TxFinalityState.FINALIZED,
+                        dioxideTransaction.getTxHash(),
+                        dioxideTransaction.getConfirmState()
+                )
+                : pendingResult;
+    }
+
+    /** A group may contain many unrelated business transactions: preserve its indexed member. */
+    static DioxideTransaction scopeTransactionReference(DioxideTransaction group, String reference) {
+        if (group == null || reference == null) { return null; }
+        int separator = reference.indexOf(':');
+        if (separator < 0) { return group; }
+        try {
+            int index = Integer.parseInt(reference.substring(separator + 1));
+            if (index < 0 || group.getEmbeddedRelays() == null || index >= group.getEmbeddedRelays().size()) { return null; }
+            DioxideTransaction member = group.getEmbeddedRelays().get(index);
+            if (member == null) { return null; }
+            return DioxideTransaction.builder().txHash(reference).state(group.getState())
+                    .confirmState(group.getConfirmState()).target(member.getTarget()).embeddedRelays(List.of(member)).build();
+        } catch (NumberFormatException e) { return null; }
+    }
+
+    static JSONObject scopeRelayGroup(JSONObject group, String reference) {
+        if (group == null || reference == null) { return null; }
+        int separator = reference.indexOf(':');
+        if (separator < 0) { return group; }
+        try {
+            int index = Integer.parseInt(reference.substring(separator + 1));
+            JSONArray members = group.getJSONArray("Relays");
+            if (index < 0 || members == null || index >= members.size()) { return null; }
+            JSONObject result = new JSONObject();
+            result.putAll(group); // JSONObject(Map) aliases its backing map; never shrink the cached group.
+            JSONArray selected = new JSONArray();
+            selected.add(members.get(index));
+            result.put("Relays", selected);
+            return result;
+        } catch (NumberFormatException e) { return null; }
+    }
+
+    static String normalizeRelayTxHash(String relayTxReference) {
+        if (StrUtil.isEmpty(relayTxReference)) {
+            return "";
+        }
+        int separatorIndex = relayTxReference.indexOf(':');
+        return separatorIndex >= 0 ? relayTxReference.substring(0, separatorIndex) : relayTxReference;
+    }
+
+    private static String collectInvocationReferences(DioxideTransaction tx, List<String> references) {
+        if (tx.getInvocation() != null) {
+            String status = tx.getInvocation().getStatus();
+            if (StrUtil.isNotEmpty(status) && !INVOCATION_SUCCESS.equals(status)) { return status; }
+            if (tx.getInvocation().getRelays() != null) { references.addAll(tx.getInvocation().getRelays()); }
+        }
+        if (tx.getEmbeddedRelays() != null) {
+            for (DioxideTransaction embedded : tx.getEmbeddedRelays()) {
+                if (embedded == null) { continue; }
+                String error = collectInvocationReferences(embedded, references);
+                if (error != null) { return error; }
+            }
+        }
+        return null;
+    }
+
+    static RelayEventInspection inspectRelayEvents(JSONObject relayGroup, String relayGroupTxHash) {
+        if (relayGroup == null) {
+            return new RelayEventInspection(RelayEventState.PENDING, List.of(), "");
+        }
+
+        DioxideTransaction relayGroupTransaction = relayGroup.toJavaObject(DioxideTransaction.class);
+        boolean relayGroupFinalized = isTxFinalized(relayGroupTransaction);
+        JSONArray eventRelays = relayGroup.getJSONArray("Relays");
+        if (CollUtil.isEmpty(eventRelays)) {
+            return relayGroupFinalized
+                    ? failedRelayEventInspection(relayGroupTxHash, "contains no embedded relay invocations")
+                    : new RelayEventInspection(RelayEventState.PENDING, List.of(), "");
+        }
+
+        List<DioxideTransaction> embeddedInvocations = eventRelays.toJavaList(DioxideTransaction.class);
+        if (CollUtil.isEmpty(embeddedInvocations)) {
+            return relayGroupFinalized
+                    ? failedRelayEventInspection(relayGroupTxHash, "contains no decodable embedded relay invocations")
+                    : new RelayEventInspection(RelayEventState.PENDING, List.of(), "");
+        }
+
+        List<String> eventTargetTxHashes = new ArrayList<>();
+        for (DioxideTransaction embeddedInvocation : embeddedInvocations) {
+            if (embeddedInvocation == null || embeddedInvocation.getInvocation() == null) {
+                continue;
+            }
+            String invocationStatus = embeddedInvocation.getInvocation().getStatus();
+            if (StrUtil.isNotEmpty(invocationStatus) && !StrUtil.equals(invocationStatus, INVOCATION_SUCCESS)) {
+                return failedRelayEventInspection(
+                        relayGroupTxHash,
+                        String.format(
+                                "embedded invocation %s failed with status %s",
+                                StrUtil.emptyToDefault(embeddedInvocation.getFunction(), "unknown"),
+                                invocationStatus
+                        )
+                );
+            }
+            if (CollUtil.isEmpty(embeddedInvocation.getInvocation().getRelays())) {
+                continue;
+            }
+            embeddedInvocation.getInvocation().getRelays().stream()
+                    .filter(StrUtil::isNotEmpty)
+                    .forEach(eventTargetTxHashes::add);
+        }
+
+        List<String> distinctTargetTxHashes = eventTargetTxHashes.stream().distinct().toList();
+        if (CollUtil.isNotEmpty(distinctTargetTxHashes)) {
+            return new RelayEventInspection(RelayEventState.READY, distinctTargetTxHashes, "");
+        }
+        // One indexed member (e.g. AM lambda 8) may legitimately emit no event.
+        // The combined receipt still requires a protocol event from another member of THIS root.
+        if (relayGroupFinalized && relayGroupTxHash.contains(":")) {
+            return new RelayEventInspection(RelayEventState.READY, List.of(), "");
+        }
+        return relayGroupFinalized
+                ? failedRelayEventInspection(relayGroupTxHash, "produced no protocol event transaction")
+                : new RelayEventInspection(RelayEventState.PENDING, List.of(), "");
+    }
+
+    private static RelayEventInspection failedRelayEventInspection(String relayGroupTxHash, String reason) {
+        return new RelayEventInspection(
+                RelayEventState.FAILED,
+                List.of(),
+                String.format(
+                        "relay transaction %s %s",
+                        StrUtil.emptyToDefault(relayGroupTxHash, "unknown"),
+                        reason
+                )
+        );
+    }
+
+    enum TxFinalityState {
+        PENDING,
+        FINALIZED,
+        FAILED
+    }
+
+    record TxFinalityResult(TxFinalityState state, String txHash, String confirmState) {
+    }
+
+    enum RelayEventState {
+        PENDING,
+        READY,
+        FAILED
+    }
+
+    record RelayEventInspection(
+            RelayEventState state,
+            List<String> eventTargetTxHashes,
+            String errorMessage
+    ) {
     }
 
     @SneakyThrows
     public String sendTransaction(String params, boolean sync) {
-//        getBbcLogger().info("params of compose: \n{}", JSON.toJSONString(JSON.parseObject(params), SerializerFeature.PrettyFormat));
-        String unsigned_txn = composeTransaction(params);
-        String signed_txn = signTransaction(unsigned_txn);
-        return sendRawTransaction(signed_txn, sync); // return txHash
+        return sendTransaction(params, sync, "operation:" + UUID.randomUUID());
+    }
+
+    @SneakyThrows
+    public String sendTransaction(String params, boolean sync, String submissionId) {
+        JSONObject request = JSON.parseObject(params);
+        String account = request.getString(request.containsKey("delegatee") ? "delegatee" : "sender");
+        JdbcTransactionCoordinator allocation = coordinator();
+        String txHash = allocation.submit(submissionId, account, params.getBytes(StandardCharsets.UTF_8),
+                new JdbcTransactionCoordinator.Transport() {
+                    public String checkpoint() {
+                        return getConsensusHeaderByHeight(coordinatorCheckpointHeight).getString("Hash");
+                    }
+                    public long currentIsn(String address) {
+                        JSONObject ret = checkIfErrorResponse(makeRequest("dx.isn", JSON.toJSONString(orderedMap("address", address))));
+                        Long isn = ret.getLong("ISN");
+                        if (isn == null) { throw new IllegalStateException("node returned no ISN"); }
+                        return isn;
+                    }
+                    public byte[] composeAndSign(long isn) {
+                        request.put("isn", isn);
+                        String unsigned = composeTransaction(JSON.toJSONString(request));
+                        byte[] encoded = Base64.getDecoder().decode(unsigned);
+                        if (encoded.length < 12 || java.nio.ByteBuffer.wrap(encoded, 8, 4)
+                                .order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt() != (int) isn) {
+                            throw new IllegalStateException("node did not compose the reserved ISN");
+                        }
+                        getBbcLogger().info("Dioxide submission prepared: id={}, account={}, isn={}", submissionId, account, isn);
+                        return Base64.getDecoder().decode(signTransaction(unsigned));
+                    }
+                    public String broadcast(byte[] signed) {
+                        return sendRawTransaction(Base64.getEncoder().encodeToString(signed), false);
+                    }
+                });
+        getBbcLogger().info("Dioxide submission accepted: id={}, account={}, hash={}", submissionId, account, txHash);
+        if (sync && !waitForTransactionConfirmed(txHash, DEFAULT_TIMEOUT)) {
+            throw new IllegalStateException("Dioxide synchronous submission timed out: " + txHash);
+        }
+        return txHash;
     }
 
     @SneakyThrows
@@ -817,10 +1275,25 @@ public class DioxideClient {
     @SneakyThrows
     private String sendRawTransaction(String signed_txn, boolean sync) {
         String rawResp = makeRequest("tx.send", JSON.toJSONString(orderedMap("txdata", signed_txn)));
-        JSONObject resp = checkIfErrorResponse(rawResp);
+        if (Objects.isNull(rawResp)) {
+            throw new RuntimeException("[tx.send] get null response from dioxide");
+        }
+        RpcResponse rpcResponse = JSON.parseObject(rawResp, RpcResponse.class);
+        if (!rpcResponse.isSuccess()) {
+            throw new JdbcTransactionCoordinator.NodeRejectedException(
+                    rpcResponse.getErr() == null ? -1 : rpcResponse.getErr(),
+                    rpcResponse.getFailResponse()
+            );
+        }
+        JSONObject resp = rpcResponse.getSuccessResponse();
+        if (Objects.isNull(resp)) {
+            throw new RuntimeException("[tx.send] get malformed success response from dioxide");
+        }
         String txHash = resp.getString("Hash");
         if (sync) {
-            waitForTransactionConfirmed(txHash, DEFAULT_TIMEOUT);
+            if (!waitForTransactionConfirmed(txHash, DEFAULT_TIMEOUT)) {
+                throw new IllegalStateException("Dioxide synchronous submission timed out: " + txHash);
+            }
         }
         return txHash;
     }
