@@ -57,7 +57,7 @@ def build(compiler, product, output):
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--compiler', required=True, type=pathlib.Path)
-    p.add_argument('--product', required=True, choices=['ethereum2'])
+    p.add_argument('--product', required=True, choices=['ethereum2', 'ethereum3'])
     p.add_argument('--output', required=True, type=pathlib.Path)
     a = p.parse_args()
     build(a.compiler, a.product, a.output)

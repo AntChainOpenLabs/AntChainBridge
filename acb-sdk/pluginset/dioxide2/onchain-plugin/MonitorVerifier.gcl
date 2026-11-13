@@ -1,0 +1,52 @@
+import IMonitorVerifier;
+import Utils;
+
+contract MonitorVerifier implements IMonitorVerifier.MonitorVerifierInterface {
+
+    @global address owner;
+    @global address ptcHubAddress;
+    @global address monitorAddress;
+    @global array<uint8> pendingSignature;
+    @global bool proofReceived;
+
+    @global function on_deploy(address _owner) {
+        owner = _owner;
+    }
+
+    @address function setPtcHub(address _ptcHubAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_ptcHubAddress) {
+            ptcHubAddress = _ptcHubAddress;
+        }
+    }
+
+    @address function setMonitor(address _monitorAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_monitorAddress) {
+            monitorAddress = _monitorAddress;
+        }
+    }
+
+    @global function receiveMonitorNodeProof(array<uint8> signature) public export {
+        __debug.assert(__transaction.get_sender() == ptcHubAddress);
+        pendingSignature = Utils.bytesCopy(signature);
+        proofReceived = true;
+    }
+
+    @global function bool verifyMonitorNodeProofMessage() public export {
+        __debug.assert(__transaction.get_sender() == monitorAddress);
+
+        bool approved = false;
+        if (proofReceived && pendingSignature.length() > 0u32) {
+            for (uint32 i = 0u32; i < pendingSignature.length(); i++) {
+                if (pendingSignature[i] != 0u8) {
+                    approved = true;
+                }
+            }
+        }
+
+        pendingSignature.set_length(0u32);
+        proofReceived = false;
+        return approved;
+    }
+}

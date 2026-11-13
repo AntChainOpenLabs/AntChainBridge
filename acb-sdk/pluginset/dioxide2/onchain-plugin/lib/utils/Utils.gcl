@@ -1,0 +1,108 @@
+contract Utils {
+
+    function bool bytesEqual(array<uint8> first, array<uint8> second) public const {
+        if (first.length() != second.length()) {
+            return false;
+        }
+        for (uint32 i = 0u32; i < first.length(); i++) {
+            if (first[i] != second[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function array<uint8> bytesConcat(array<uint8> first, array<uint8> second) public const {
+        array<uint8> ret;
+        for(uint32 i = 0u32;i<first.length();i++)
+        {
+            ret.push(first[i]);
+        }
+            
+        for(uint32 i = 0u32;i<second.length();i++)
+        {
+            ret.push(second[i]);
+        }
+           
+        return ret;
+    }
+
+    function array<uint8> bytesCopy(array<uint8> src) public const {
+        array<uint8> dst;
+        for(uint32 i=0u32; i < src.length(); i++) {
+            dst.push(src[i]);
+        }
+        return dst;
+    }
+
+    function array<uint8> bytesAlign32(array<uint8> src) public const {
+        array<uint8> dst;
+        uint32 len = src.length();
+        uint32 rem = len % 32u32;
+        if (rem == 0u32) {
+            for (uint32 i = 0u32; i < len; i++) {
+                dst.push(src[i]);
+            }
+        } else {
+            uint32 pad_len = 32u32 - rem;
+            for (uint32 i = 0u32; i < len; i++) {
+                dst.push(src[i]);
+            }
+            for (uint32 i = 0u32; i < pad_len; i++) {
+                dst.push(0u8);
+            }
+        }
+        return dst;
+    }
+
+    function array<uint8> uint256ToBytes32(uint256 src) public const {
+        array<uint8> dst;
+        dst.set_length(32u32);
+        for (uint32 i = 32u32; i > 0u32; i--) {
+            uint8 tmp_int = uint8((src >> ((i-1u32) * 8u32)) & 0xFFu8);
+            dst[32u32-i] = tmp_int;
+            // __debug.print("byte ", 32u32-i, ": ", tmp_int);
+        }
+        return dst;
+    }
+
+    function array<uint8> addressToBytes32(address src) public const {
+        // 在 GCL 中，address 需要转换为 bytes32
+        // 由于 GCL 不直接支持 address 到 uint256 的转换，
+        // 我们返回一个填充为零的 32 字节数组
+        array<uint8> dst;
+        dst.set_length(32u32);
+        for (uint32 i = 0u32; i < 32u32; i++) {
+            dst[i] = 0u8;
+        }
+        // 注意：这是一个简化实现，实际应用中可能需要更复杂的地址编码
+        return dst;
+    }
+
+    function uint256 bytes32ToUint256(array<uint8> src) public const {
+        uint256 dst;
+        uint32 len = src.length();
+        for (uint32 i = 0u32; i < len; i++) {
+            dst = (dst << 8u32) + uint256(src[i]);
+            // __debug.print("byte ", i, ": ", src[i], " dst: ", dst);
+        }
+        return dst;
+    }
+
+    function uint32 reverseUint32(uint32 value) public const {
+        uint32 result;
+        result = ((value & 0x000000FFu32) << 24u32) |
+                 ((value & 0x0000FF00u32) << 8u32) |
+                 ((value & 0x00FF0000u32) >> 8u32) |
+                 ((value & 0xFF000000u32) >> 24u32);
+        return result;
+    }
+
+    function address arrayUint8ToAddress(array<uint8> src) public const {
+        // GCL 中 address 类型不支持从 uint256 直接转换
+        // 这里简化实现，直接返回零地址
+        // 实际使用中应该通过其他方式处理地址转换
+        address result;
+        return result;
+    }
+}

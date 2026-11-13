@@ -1,0 +1,56 @@
+import Utils;
+
+contract BytesToTypes {
+    
+    function uint256 bytesToUint256(uint32 offset, array<uint8> input) public const {
+        return bytesToUint(offset, input, 32u32);
+    }
+
+    function uint32 bytesToUint32(uint32 offset, array<uint8> input) public const {
+        return uint32(bytesToUint(offset, input, 4u32));
+    }
+
+    function uint16 bytesToUint16(uint32 offset, array<uint8> input) public const {
+        return uint16(bytesToUint(offset, input, 2u32));
+    }
+
+    function uint256 bytesToUint(uint32 offset, array<uint8> input, uint32 len) public const {
+        uint256 output;
+        for(uint32 i = offset - len; i < offset; i++) {
+            output = (output << 8u32) + uint256(input[i]);
+        }
+
+        return output;
+    }
+
+    function bytesToSubBytes(uint32 offset, array<uint8> input, array<uint8> output) public const {
+        uint32 len = uint32(bytesToUint256(offset, input));
+        offset -= 32u32;
+        while (len > 0u32) {
+            offset -= 32u32;
+            for (uint32 i = 0u32; i < 32u32 && len > 0u32; i++) {
+                output.push(input[offset + i]);
+                len--;
+            }
+        }
+    }
+
+
+    function varBytesToSubBytes(uint32 offset, array<uint8> input, array<uint8> output) public const {
+        uint32 len = bytesToUint32(offset, input);
+        offset -= 4u32;
+        __debug.assert(offset == len);
+        for(uint32 i = 0u32; i < len; i++) {
+            output.push(input[i]);
+        }
+    }
+
+
+    function bytesToBytes32(uint32 offset, array<uint8> input, array<uint8> output) public const {
+        offset -= 32u32;
+        for (uint32 i = 0u32; i < 32u32; i++) {
+            output.push(input[offset + i]);
+        }
+    }
+
+}

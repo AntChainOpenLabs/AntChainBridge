@@ -1,18 +1,39 @@
-# Reproducible Ethereum Base system-contract build
+# Optimized Ethereum contract build
 
-Generate the ignored Web3j wrappers before compiling the Ethereum plugin. Use
-standard Solidity 0.8.29+commit.ab55807c (official Linux amd64 SHA-256 checked
-by the script), optimizer enabled with 200 runs, viaIR and London EVM:
+Both Ethereum products use standard Solidity `0.8.29+commit.ab55807c`, optimizer
+`enabled=true,runs=200`, `viaIR=true`, `evmVersion=london`, and IPFS metadata.
+The IR pipeline keeps the optimized Xun SDP and PtcHub below EIP-170's 24,576-byte
+runtime limit. These compiler conditions differ from the FISCO/MySolidity builds
+and must be recorded when comparing Gas across chains.
 
-```sh
+Build each product into a new directory (the command refuses to overwrite):
+
+```bash
 python3 tools/ethereum-contracts/build.py --compiler /path/to/solc \
-  --product ethereum2 --output /path/to/new/build
+  --product ethereum2 --output /path/to/new/ethereum2-build
+python3 tools/ethereum-contracts/build.py --compiler /path/to/solc \
+  --product ethereum3 --output /path/to/new/ethereum3-build
 ```
 
-The output includes complete compiler input/results, ABI, creation and runtime
-bytecode, source/compiler hashes and EIP-170 size checks. The build resolves the
-root CommitteePtcVerifier contract explicitly instead of the legacy library of
-the same name. Generate each listed wrapper with Web3j codegen 4.12.1 into
-`com.alipay.antchain.bridge.plugins.ethereum2.abi`, then run the plugin tests.
-Record compiler settings when adopting new deployments. Building a plugin does
-not upgrade existing on-chain contracts.
+Outputs include complete standard-JSON inputs/results, source/compiler SHA-256,
+ABI, creation bytecode, runtime bytecode, storage layout and size checks. Regenerate
+selected Web3j wrappers with the existing 4.12.1 code generator, then build the
+respective offchain plugin with Java 21. Do not invoke a compiler auto-download
+step that silently replaces these settings. PaperApp keeps the existing standard
+0.8.13 optimized bytecode shared with the FISCO application baseline.
+
+Ethereum3 consumes the same optimized EVM Monitor, MonitorVerifier and committee
+proof-context implementation used in the recent FISCO experiments. V1 unordered
+sending omits only the auxiliary approval event and avoids temporary encoding
+objects. The original AM event, blacklists, author and wire encoding remain.
+Destination verification keeps a message-bound, one-use result rather than
+persisting the full signed payload. No AM fast path or storage packing is added.
+
+The Java initialization path authorizes the final Monitor **proxy** as the
+MonitorVerifier consumer. It checks native receipt success and getter readback,
+skips an already correct binding, and rejects a conflicting nonzero binding.
+The final PtcHub binding uses the same checks. Merely starting a BBC does not
+perform these binding transactions; they belong to explicit initialization.
+
+Local preparation does not prove new business communication: crosschain message
+sends and later paper measurements require a separate acceptance run.

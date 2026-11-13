@@ -1,0 +1,8 @@
+{
+  "caCert": "-----BEGIN CERTIFICATE-----\nMIIDA……9EUcg=\n-----END CERTIFICATE-----\n",
+  "sslCert": "-----BEGIN CERTIFICATE-----\nMIIDF……oDejg==\n-----END CERTIFICATE-----\n",
+  "sslKey": "-----BEGIN PRIVATE KEY-----\nMIIEv……1yaTy\n-----END PRIVATE KEY-----\n",
+  "disableSsl": "true",
+  "connectPeer": "127.0.0.1:20200",
+  "groupID": "group0"
+}
