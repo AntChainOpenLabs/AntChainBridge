@@ -79,6 +79,13 @@ public class FISCOBCOSConfig {
     @JSONField
     private String accountFileFormat = "pem";
 
+    /** Optional explicit PEM account file used by the FISCO SDK v3 client. */
+    @JSONField
+    private String accountFilePath;
+
+    @JSONField
+    private String accountPassword = "";
+
     // client
     @JSONField
     private String groupID;

@@ -66,6 +66,7 @@ import org.fisco.bcos.sdk.v3.config.model.*;
 import org.fisco.bcos.sdk.v3.model.TransactionReceipt;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Assume;
 import org.junit.Test;
 import org.slf4j.Logger;
 
@@ -74,11 +75,18 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.PrivateKey;
 import java.util.*;
 
 @Slf4j
 public class FISCOBCOSBBCServiceTest {
+    private static final String LIVE_ENABLED_PROPERTY = "fisco.live.enabled";
+    private static final String LIVE_SDK_DIR_PROPERTY = "fisco.live.sdkDir";
+    private static final String LIVE_PEER_PROPERTY = "fisco.live.peer";
+    private static final String LIVE_GROUP_PROPERTY = "fisco.live.group";
+
     private static final String CA_CERT =
             "-----BEGIN CERTIFICATE-----\n" +
                     "MIIDITCCAgkCFEVsj5CJ/L0eQGo0lch0GGfcK+EwMA0GCSqGSIb3DQEBCwUAMEwx\n" +
@@ -326,7 +334,12 @@ public class FISCOBCOSBBCServiceTest {
 
     @Before
     public void init() throws Exception {
+        Assume.assumeTrue(
+                "set -Dfisco.live.enabled=true to run the FISCO on-chain integration test",
+                Boolean.parseBoolean(System.getProperty(LIVE_ENABLED_PROPERTY, "false")));
         FISCOBCOSConfig config = new FISCOBCOSConfig();
+        config.setConnectPeer(livePeer());
+        config.setDefaultGroup(liveGroup());
 
         ConfigProperty configProperty = new ConfigProperty();
 
@@ -360,9 +373,9 @@ public class FISCOBCOSBBCServiceTest {
         ConfigOption configOption = new ConfigOption();
 
         CryptoMaterialConfig cryptoMaterialConfig = new CryptoMaterialConfig();
-        cryptoMaterialConfig.setCaCert(CA_CERT);
-        cryptoMaterialConfig.setSdkCert(SSL_CERT);
-        cryptoMaterialConfig.setSdkPrivateKey(SSL_KEY);
+        cryptoMaterialConfig.setCaCert(livePem("ca.crt"));
+        cryptoMaterialConfig.setSdkCert(livePem("sdk.crt"));
+        cryptoMaterialConfig.setSdkPrivateKey(livePem("sdk.key"));
         configOption.setCryptoMaterialConfig(cryptoMaterialConfig);
 
         configOption.setAccountConfig(new AccountConfig(configProperty));
@@ -376,7 +389,7 @@ public class FISCOBCOSBBCServiceTest {
         // Initialize BcosSDK
         BcosSDK sdk = new BcosSDK(configOption);
         // Initialize the client for the group
-        Client client = sdk.getClient(VALID_GROUPID);
+        Client client = sdk.getClient(liveGroup());
 
         appContract = AppContract.deploy(client, client.getCryptoSuite().getCryptoKeyPair());
 
@@ -836,6 +849,57 @@ public class FISCOBCOSBBCServiceTest {
         }
     }
 
+    /**
+     * Preferred low-write live-chain acceptance flow. Run this method explicitly instead of the
+     * historical granular methods, which intentionally deploy independent contract sets.
+     */
+    @Test
+    public void testLiveEndToEnd() {
+        setupBbc();
+
+        Assert.assertNull(fiscobcosBBCService.getBbcContext().getMonitorContract());
+        Assert.assertTrue(fiscobcosBBCService.hasPTCTrustRoot(oid));
+        Assert.assertTrue(fiscobcosBBCService.hasPTCVerifyAnchor(oid, BigInteger.ONE));
+        Assert.assertTrue(fiscobcosBBCService.hasTpBta(
+                tpbta.getCrossChainLane(), tpbta.getTpbtaVersion()));
+
+        long before = fiscobcosBBCService.queryLatestHeight();
+        TransactionReceipt outbound = appContract.sendUnorderedMessage(
+                "remoteDomain",
+                DigestUtil.sha256(REMOTE_APP_CONTRACT),
+                "fiscobcos-live-outbound".getBytes());
+        Assert.assertTrue(outbound.isStatusOK());
+
+        long after = fiscobcosBBCService.queryLatestHeight();
+        List<CrossChainMessage> messages = new ArrayList<>();
+        for (long height = before; height <= after; height++) {
+            messages.addAll(fiscobcosBBCService.readCrossChainMessagesByHeight(height));
+        }
+        Assert.assertTrue(messages.stream().anyMatch(message -> {
+            IAuthMessage authMessage = AuthMessageFactory.createAuthMessage(message.getMessage());
+            ISDPMessage sdpMessage = SDPMessageFactory.createSDPMessage(authMessage.getPayload());
+            return Arrays.equals("fiscobcos-live-outbound".getBytes(), sdpMessage.getPayload());
+        }));
+
+        ConsensusState consensusState = fiscobcosBBCService.readConsensusState(outbound.getBlockNumber());
+        Assert.assertEquals(outbound.getBlockNumber(), consensusState.getHeight());
+        Assert.assertNotNull(consensusState.getHash());
+        Assert.assertNotNull(consensusState.getParentHash());
+        Assert.assertTrue(consensusState.getStateTimestamp() > 0);
+        Assert.assertTrue(new String(consensusState.getStateData()).contains("transactionsRoot"));
+
+        CrossChainMessageReceipt inbound = fiscobcosBBCService.relayAuthMessage(
+                getRawMsgFromRelayer(appContract.getContractAddress()));
+        Assert.assertTrue(
+                "inbound relay failed, tx=" + inbound.getTxhash()
+                        + ", error=" + inbound.getErrorMsg(),
+                inbound.isSuccessful());
+        CrossChainMessageReceipt persisted = fiscobcosBBCService.readCrossChainMessageReceipt(
+                inbound.getTxhash());
+        Assert.assertTrue(persisted.isConfirmed());
+        Assert.assertTrue(persisted.isSuccessful());
+    }
+
 
     @SneakyThrows
     private void setupBbc() {
@@ -898,13 +962,15 @@ public class FISCOBCOSBBCServiceTest {
 
     private AbstractBBCContext mockValidCtx() {
         FISCOBCOSConfig mockConf = new FISCOBCOSConfig();
-        mockConf.setCaCert(CA_CERT);
-        mockConf.setSslCert(SSL_CERT);
-        mockConf.setSslKey(SSL_KEY);
-        mockConf.setConnectPeer("127.0.0.1:20200");
-        mockConf.setGroupID(VALID_GROUPID);
+        mockConf.setCaCert(livePem("ca.crt"));
+        mockConf.setSslCert(livePem("sdk.crt"));
+        mockConf.setSslKey(livePem("sdk.key"));
+        mockConf.setDisableSsl("false");
+        mockConf.setUseSMCrypto("false");
+        mockConf.setConnectPeer(livePeer());
+        mockConf.setDefaultGroup(liveGroup());
+        mockConf.setGroupID(liveGroup());
         mockConf.setBcdnsRootCertPem(BCDNS_CERT);
-        System.out.println("mockConf JSON: " + mockConf.toJsonString());
         AbstractBBCContext mockCtx = new DefaultBBCContext();
         mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
         return mockCtx;
@@ -912,11 +978,13 @@ public class FISCOBCOSBBCServiceTest {
 
     private AbstractBBCContext mockValidCtxWithPreDeployedContracts(String amAddr, String sdpAddr, String ptcAddr) {
         FISCOBCOSConfig mockConf = new FISCOBCOSConfig();
-        mockConf.setCaCert(CA_CERT);
-        mockConf.setSslCert(SSL_CERT);
-        mockConf.setSslKey(SSL_KEY);
-        mockConf.setConnectPeer("127.0.0.1:20200");
-        mockConf.setGroupID(VALID_GROUPID);
+        mockConf.setCaCert(livePem("ca.crt"));
+        mockConf.setSslCert(livePem("sdk.crt"));
+        mockConf.setSslKey(livePem("sdk.key"));
+        mockConf.setDisableSsl("false");
+        mockConf.setConnectPeer(livePeer());
+        mockConf.setDefaultGroup(liveGroup());
+        mockConf.setGroupID(liveGroup());
         AbstractBBCContext mockCtx = new DefaultBBCContext();
         mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
 
@@ -940,11 +1008,13 @@ public class FISCOBCOSBBCServiceTest {
 
     private AbstractBBCContext mockValidCtxWithPreReadyContracts(String amAddr, String sdpAddr, String ptcAddr) {
         FISCOBCOSConfig mockConf = new FISCOBCOSConfig();
-        mockConf.setCaCert(CA_CERT);
-        mockConf.setSslCert(SSL_CERT);
-        mockConf.setSslKey(SSL_KEY);
-        mockConf.setConnectPeer("127.0.0.1:20200");
-        mockConf.setGroupID(VALID_GROUPID);
+        mockConf.setCaCert(livePem("ca.crt"));
+        mockConf.setSslCert(livePem("sdk.crt"));
+        mockConf.setSslKey(livePem("sdk.key"));
+        mockConf.setDisableSsl("false");
+        mockConf.setConnectPeer(livePeer());
+        mockConf.setDefaultGroup(liveGroup());
+        mockConf.setGroupID(liveGroup());
         mockConf.setBcdnsRootCertPem(BCDNS_CERT);
         AbstractBBCContext mockCtx = new DefaultBBCContext();
         mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
@@ -969,15 +1039,42 @@ public class FISCOBCOSBBCServiceTest {
 
     private AbstractBBCContext mockInvalidCtx() {
         FISCOBCOSConfig mockConf = new FISCOBCOSConfig();
-        mockConf.setCaCert(CA_CERT);
-        mockConf.setSslCert(SSL_CERT);
-        mockConf.setSslKey(SSL_KEY);
-        mockConf.setConnectPeer("127.0.0.1:20200");
+        mockConf.setCaCert(livePem("ca.crt"));
+        mockConf.setSslCert(livePem("sdk.crt"));
+        mockConf.setSslKey(livePem("sdk.key"));
+        mockConf.setDisableSsl("false");
+        mockConf.setConnectPeer(livePeer());
+        mockConf.setDefaultGroup(liveGroup());
         mockConf.setGroupID(INVALID_GROUPID);
-        System.out.println("mockConf JSON: " + mockConf.toJsonString());
         AbstractBBCContext mockCtx = new DefaultBBCContext();
         mockCtx.setConfForBlockchainClient(mockConf.toJsonString().getBytes());
         return mockCtx;
+    }
+
+    private static String livePeer() {
+        return System.getProperty(LIVE_PEER_PROPERTY, "127.0.0.1:20200");
+    }
+
+    private static String liveGroup() {
+        return System.getProperty(LIVE_GROUP_PROPERTY, VALID_GROUPID);
+    }
+
+    @SneakyThrows
+    private static String livePem(String fileName) {
+        String sdkDir = System.getProperty(LIVE_SDK_DIR_PROPERTY);
+        if (sdkDir == null || sdkDir.isBlank()) {
+            throw new IllegalArgumentException(
+                    "missing -D" + LIVE_SDK_DIR_PROPERTY + " for FISCO live tests");
+        }
+        Path pem = Path.of(sdkDir).resolve(fileName).normalize();
+        if (!Files.isRegularFile(pem)) {
+            throw new IllegalArgumentException("missing FISCO SDK material: " + pem);
+        }
+        String value = Files.readString(pem);
+        if (!value.contains("-----BEGIN ")) {
+            throw new IllegalArgumentException("invalid PEM file: " + pem);
+        }
+        return value;
     }
 
     @SneakyThrows
@@ -1010,10 +1107,17 @@ public class FISCOBCOSBBCServiceTest {
                         NODE_PTC_PRIVATE_KEY,
                         thirdPartyProof.getEncodedToSign()
                 )).build();
+        CommitteeNodeProof node2Proof = CommitteeNodeProof.builder()
+                .nodeId("node2")
+                .signAlgo(SignAlgoEnum.KECCAK256_WITH_SECP256K1)
+                .signature(SignAlgoEnum.KECCAK256_WITH_SECP256K1.getSigner().sign(
+                        NODE_PTC_PRIVATE_KEY,
+                        thirdPartyProof.getEncodedToSign()
+                )).build();
 
         CommitteeEndorseProof endorseProof = new CommitteeEndorseProof();
         endorseProof.setCommitteeId(COMMITTEE_ID);
-        endorseProof.setSigs(ListUtil.toList(node1Proof));
+        endorseProof.setSigs(ListUtil.toList(node1Proof, node2Proof));
 
         thirdPartyProof.setRawProof(endorseProof.encode());
 

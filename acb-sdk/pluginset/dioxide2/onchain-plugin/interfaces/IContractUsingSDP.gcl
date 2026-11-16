@@ -1,0 +1,23 @@
+contract IContractUsingSDP {
+    interface ContractUsingSDPInterface {
+        /**
+        * @dev SDP contract would call this function to deliver the message from sender contract
+        * on sender blockchain. This message sent with no order and in parallel.
+        *
+        * @param senderDomain the domain name of the sending blockchain.
+        * @param author the id of the sender.
+        * @param message the raw message from sender contract.
+        */
+        @global function recvUnorderedMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public;
+
+        /**
+        * @dev SDP contract would call this function to deliver the message from sender contract
+        * on sender blockchain. This message sent with order.
+        *
+        * @param senderDomain the domain name of the sending blockchain.
+        * @param author the id of the sender.
+        * @param message the raw message from sender contract.
+        */
+        @global function recvMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public;
+    }
+}

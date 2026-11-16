@@ -90,43 +90,43 @@ public class PtcHub extends Contract {
 
     public static final String FUNC_VERIFYPROOF = "verifyProof";
 
-    public static final Event ADDPTCVERIFIER_EVENT = new Event("AddPtcVerifier", 
+    public static final Event ADDPTCVERIFIER_EVENT = new Event("AddPtcVerifier",
             Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}, new TypeReference<Address>() {}));
     ;
 
-    public static final Event INITIALIZED_EVENT = new Event("Initialized", 
+    public static final Event INITIALIZED_EVENT = new Event("Initialized",
             Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
     ;
 
-    public static final Event LATESTTPBTA_EVENT = new Event("LatestTpBta", 
+    public static final Event LATESTTPBTA_EVENT = new Event("LatestTpBta",
             Arrays.<TypeReference<?>>asList(new TypeReference<Bytes32>() {}, new TypeReference<Uint256>() {}));
     ;
 
-    public static final Event NEWBCDNSCERT_EVENT = new Event("NewBcdnsCert", 
+    public static final Event NEWBCDNSCERT_EVENT = new Event("NewBcdnsCert",
             Arrays.<TypeReference<?>>asList(new TypeReference<Bytes32>() {}));
     ;
 
-    public static final Event NEWPTRTRUSTROOT_EVENT = new Event("NewPtrTrustRoot", 
+    public static final Event NEWPTRTRUSTROOT_EVENT = new Event("NewPtrTrustRoot",
             Arrays.<TypeReference<?>>asList(new TypeReference<Bytes32>() {}));
     ;
 
-    public static final Event NEWVERIFYANCHOR_EVENT = new Event("NewVerifyAnchor", 
+    public static final Event NEWVERIFYANCHOR_EVENT = new Event("NewVerifyAnchor",
             Arrays.<TypeReference<?>>asList(new TypeReference<Bytes32>() {}, new TypeReference<Uint256>() {}));
     ;
 
-    public static final Event OWNERSHIPTRANSFERRED_EVENT = new Event("OwnershipTransferred", 
+    public static final Event OWNERSHIPTRANSFERRED_EVENT = new Event("OwnershipTransferred",
             Arrays.<TypeReference<?>>asList(new TypeReference<Address>(true) {}, new TypeReference<Address>(true) {}));
     ;
 
-    public static final Event REMOVEPTCVERIFIER_EVENT = new Event("RemovePtcVerifier", 
+    public static final Event REMOVEPTCVERIFIER_EVENT = new Event("RemovePtcVerifier",
             Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
     ;
 
-    public static final Event SAVETPBTA_EVENT = new Event("SaveTpBta", 
+    public static final Event SAVETPBTA_EVENT = new Event("SaveTpBta",
             Arrays.<TypeReference<?>>asList(new TypeReference<Bytes32>() {}, new TypeReference<Uint256>() {}));
     ;
 
-    public static final Event VERIFYPROOF_EVENT = new Event("VerifyProof", 
+    public static final Event VERIFYPROOF_EVENT = new Event("VerifyProof",
             Arrays.<TypeReference<?>>asList(new TypeReference<CrossChainLane>() {}, new TypeReference<Bool>() {}));
     ;
 
@@ -389,40 +389,40 @@ public class PtcHub extends Contract {
 
     public TransactionReceipt addPtcVerifier(String verifierContract) {
         final Function function = new Function(
-                FUNC_ADDPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)), 
+                FUNC_ADDPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodAddPtcVerifierRawFunction(String verifierContract) throws
             ContractException {
-        final Function function = new Function(FUNC_ADDPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)), 
+        final Function function = new Function(FUNC_ADDPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForAddPtcVerifier(String verifierContract) {
         final Function function = new Function(
-                FUNC_ADDPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)), 
+                FUNC_ADDPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String addPtcVerifier(String verifierContract, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_ADDPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)), 
+                FUNC_ADDPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(verifierContract)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public Tuple1<String> getAddPtcVerifierInput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_ADDPTCVERIFIER, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_ADDPTCVERIFIER,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<String>(
@@ -433,39 +433,39 @@ public class PtcHub extends Contract {
 
     public TransactionReceipt addTpBta(byte[] rawTpBta) {
         final Function function = new Function(
-                FUNC_ADDTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)), 
+                FUNC_ADDTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodAddTpBtaRawFunction(byte[] rawTpBta) throws ContractException {
-        final Function function = new Function(FUNC_ADDTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)), 
+        final Function function = new Function(FUNC_ADDTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForAddTpBta(byte[] rawTpBta) {
         final Function function = new Function(
-                FUNC_ADDTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)), 
+                FUNC_ADDTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String addTpBta(byte[] rawTpBta, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_ADDTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)), 
+                FUNC_ADDTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpBta)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public Tuple1<byte[]> getAddTpBtaInput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_ADDTPBTA, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_ADDTPBTA,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<byte[]>(
@@ -475,183 +475,183 @@ public class PtcHub extends Contract {
     }
 
     public byte[] bcdnsCertMap(String param0) throws ContractException {
-        final Function function = new Function(FUNC_BCDNSCERTMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Utf8String(param0)), 
+        final Function function = new Function(FUNC_BCDNSCERTMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Utf8String(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return executeCallWithSingleValueReturn(function, byte[].class);
     }
 
     public Function getMethodBcdnsCertMapRawFunction(String param0) throws ContractException {
-        final Function function = new Function(FUNC_BCDNSCERTMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Utf8String(param0)), 
+        final Function function = new Function(FUNC_BCDNSCERTMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Utf8String(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return function;
     }
 
     public byte[] getLatestTpBta(byte[] tpbtaLane) throws ContractException {
-        final Function function = new Function(FUNC_GETLATESTTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane)), 
+        final Function function = new Function(FUNC_GETLATESTTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return executeCallWithSingleValueReturn(function, byte[].class);
     }
 
     public Function getMethodGetLatestTpBtaRawFunction(byte[] tpbtaLane) throws ContractException {
-        final Function function = new Function(FUNC_GETLATESTTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane)), 
+        final Function function = new Function(FUNC_GETLATESTTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return function;
     }
 
     public byte[] getPTCTrustRoot(byte[] ptcOwnerOid) throws ContractException {
-        final Function function = new Function(FUNC_GETPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)), 
+        final Function function = new Function(FUNC_GETPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return executeCallWithSingleValueReturn(function, byte[].class);
     }
 
     public Function getMethodGetPTCTrustRootRawFunction(byte[] ptcOwnerOid) throws
             ContractException {
-        final Function function = new Function(FUNC_GETPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)), 
+        final Function function = new Function(FUNC_GETPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return function;
     }
 
     public byte[] getPTCVerifyAnchor(byte[] ptcOwnerOid, BigInteger versionNum) throws
             ContractException {
-        final Function function = new Function(FUNC_GETPTCVERIFYANCHOR, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)), 
+        final Function function = new Function(FUNC_GETPTCVERIFYANCHOR,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return executeCallWithSingleValueReturn(function, byte[].class);
     }
 
     public Function getMethodGetPTCVerifyAnchorRawFunction(byte[] ptcOwnerOid,
             BigInteger versionNum) throws ContractException {
-        final Function function = new Function(FUNC_GETPTCVERIFYANCHOR, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)), 
+        final Function function = new Function(FUNC_GETPTCVERIFYANCHOR,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return function;
     }
 
     public List getSupportedPTCType() throws ContractException {
-        final Function function = new Function(FUNC_GETSUPPORTEDPTCTYPE, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_GETSUPPORTEDPTCTYPE,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicArray<Uint8>>() {}));
         List<Type> result = (List<Type>) executeCallWithSingleValueReturn(function, List.class);
         return convertToNative(result);
     }
 
     public Function getMethodGetSupportedPTCTypeRawFunction() throws ContractException {
-        final Function function = new Function(FUNC_GETSUPPORTEDPTCTYPE, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_GETSUPPORTEDPTCTYPE,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicArray<Uint8>>() {}));
         return function;
     }
 
     public byte[] getTpBta(byte[] tpbtaLane, BigInteger tpBtaVersion) throws ContractException {
-        final Function function = new Function(FUNC_GETTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)), 
+        final Function function = new Function(FUNC_GETTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return executeCallWithSingleValueReturn(function, byte[].class);
     }
 
     public Function getMethodGetTpBtaRawFunction(byte[] tpbtaLane, BigInteger tpBtaVersion) throws
             ContractException {
-        final Function function = new Function(FUNC_GETTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)), 
+        final Function function = new Function(FUNC_GETTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return function;
     }
 
     public Boolean hasPTCTrustRoot(byte[] ptcOwnerOid) throws ContractException {
-        final Function function = new Function(FUNC_HASPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)), 
+        final Function function = new Function(FUNC_HASPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return executeCallWithSingleValueReturn(function, Boolean.class);
     }
 
     public Function getMethodHasPTCTrustRootRawFunction(byte[] ptcOwnerOid) throws
             ContractException {
-        final Function function = new Function(FUNC_HASPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)), 
+        final Function function = new Function(FUNC_HASPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return function;
     }
 
     public Boolean hasPTCVerifyAnchor(byte[] ptcOwnerOid, BigInteger versionNum) throws
             ContractException {
-        final Function function = new Function(FUNC_HASPTCVERIFYANCHOR, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)), 
+        final Function function = new Function(FUNC_HASPTCVERIFYANCHOR,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return executeCallWithSingleValueReturn(function, Boolean.class);
     }
 
     public Function getMethodHasPTCVerifyAnchorRawFunction(byte[] ptcOwnerOid,
             BigInteger versionNum) throws ContractException {
-        final Function function = new Function(FUNC_HASPTCVERIFYANCHOR, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)), 
+        final Function function = new Function(FUNC_HASPTCVERIFYANCHOR,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(ptcOwnerOid),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(versionNum)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return function;
     }
 
     public Boolean hasTpBta(byte[] tpbtaLane, BigInteger tpBtaVersion) throws ContractException {
-        final Function function = new Function(FUNC_HASTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)), 
+        final Function function = new Function(FUNC_HASTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return executeCallWithSingleValueReturn(function, Boolean.class);
     }
 
     public Function getMethodHasTpBtaRawFunction(byte[] tpbtaLane, BigInteger tpBtaVersion) throws
             ContractException {
-        final Function function = new Function(FUNC_HASTPBTA, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane), 
-                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)), 
+        final Function function = new Function(FUNC_HASTPBTA,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(tpbtaLane),
+                new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint32(tpBtaVersion)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Bool>() {}));
         return function;
     }
 
     public TransactionReceipt init(byte[] rawRootBcdnsCert) {
         final Function function = new Function(
-                FUNC_INIT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)), 
+                FUNC_INIT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodInitRawFunction(byte[] rawRootBcdnsCert) throws ContractException {
-        final Function function = new Function(FUNC_INIT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)), 
+        final Function function = new Function(FUNC_INIT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForInit(byte[] rawRootBcdnsCert) {
         final Function function = new Function(
-                FUNC_INIT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)), 
+                FUNC_INIT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String init(byte[] rawRootBcdnsCert, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_INIT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)), 
+                FUNC_INIT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawRootBcdnsCert)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public Tuple1<byte[]> getInitInput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_INIT, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_INIT,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<byte[]>(
@@ -661,99 +661,99 @@ public class PtcHub extends Contract {
     }
 
     public String owner() throws ContractException {
-        final Function function = new Function(FUNC_OWNER, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_OWNER,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeCallWithSingleValueReturn(function, String.class);
     }
 
     public Function getMethodOwnerRawFunction() throws ContractException {
-        final Function function = new Function(FUNC_OWNER, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_OWNER,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return function;
     }
 
     public String ownerOidToBcdnsDomainSpaceMap(byte[] param0) throws ContractException {
-        final Function function = new Function(FUNC_OWNEROIDTOBCDNSDOMAINSPACEMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)), 
+        final Function function = new Function(FUNC_OWNEROIDTOBCDNSDOMAINSPACEMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Utf8String>() {}));
         return executeCallWithSingleValueReturn(function, String.class);
     }
 
     public Function getMethodOwnerOidToBcdnsDomainSpaceMapRawFunction(byte[] param0) throws
             ContractException {
-        final Function function = new Function(FUNC_OWNEROIDTOBCDNSDOMAINSPACEMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)), 
+        final Function function = new Function(FUNC_OWNEROIDTOBCDNSDOMAINSPACEMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Utf8String>() {}));
         return function;
     }
 
     public byte[] ptcTrustRootMap(byte[] param0) throws ContractException {
-        final Function function = new Function(FUNC_PTCTRUSTROOTMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)), 
+        final Function function = new Function(FUNC_PTCTRUSTROOTMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return executeCallWithSingleValueReturn(function, byte[].class);
     }
 
     public Function getMethodPtcTrustRootMapRawFunction(byte[] param0) throws ContractException {
-        final Function function = new Function(FUNC_PTCTRUSTROOTMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)), 
+        final Function function = new Function(FUNC_PTCTRUSTROOTMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         return function;
     }
 
     public BigInteger ptcTypeSupported(BigInteger param0) throws ContractException {
-        final Function function = new Function(FUNC_PTCTYPESUPPORTED, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(param0)), 
+        final Function function = new Function(FUNC_PTCTYPESUPPORTED,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
         return executeCallWithSingleValueReturn(function, BigInteger.class);
     }
 
     public Function getMethodPtcTypeSupportedRawFunction(BigInteger param0) throws
             ContractException {
-        final Function function = new Function(FUNC_PTCTYPESUPPORTED, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(param0)), 
+        final Function function = new Function(FUNC_PTCTYPESUPPORTED,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint256(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
         return function;
     }
 
     public TransactionReceipt removePtcVerifier(BigInteger ptcType) {
         final Function function = new Function(
-                FUNC_REMOVEPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)), 
+                FUNC_REMOVEPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodRemovePtcVerifierRawFunction(BigInteger ptcType) throws
             ContractException {
-        final Function function = new Function(FUNC_REMOVEPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)), 
+        final Function function = new Function(FUNC_REMOVEPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForRemovePtcVerifier(BigInteger ptcType) {
         final Function function = new Function(
-                FUNC_REMOVEPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)), 
+                FUNC_REMOVEPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String removePtcVerifier(BigInteger ptcType, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_REMOVEPTCVERIFIER, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)), 
+                FUNC_REMOVEPTCVERIFIER,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(ptcType)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public Tuple1<BigInteger> getRemovePtcVerifierInput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_REMOVEPTCVERIFIER, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_REMOVEPTCVERIFIER,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint8>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<BigInteger>(
@@ -764,85 +764,85 @@ public class PtcHub extends Contract {
 
     public TransactionReceipt renounceOwnership() {
         final Function function = new Function(
-                FUNC_RENOUNCEOWNERSHIP, 
-                Arrays.<Type>asList(), 
+                FUNC_RENOUNCEOWNERSHIP,
+                Arrays.<Type>asList(),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodRenounceOwnershipRawFunction() throws ContractException {
-        final Function function = new Function(FUNC_RENOUNCEOWNERSHIP, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_RENOUNCEOWNERSHIP,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForRenounceOwnership() {
         final Function function = new Function(
-                FUNC_RENOUNCEOWNERSHIP, 
-                Arrays.<Type>asList(), 
+                FUNC_RENOUNCEOWNERSHIP,
+                Arrays.<Type>asList(),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String renounceOwnership(TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_RENOUNCEOWNERSHIP, 
-                Arrays.<Type>asList(), 
+                FUNC_RENOUNCEOWNERSHIP,
+                Arrays.<Type>asList(),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public BigInteger tpBtaMap(byte[] param0) throws ContractException {
-        final Function function = new Function(FUNC_TPBTAMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)), 
+        final Function function = new Function(FUNC_TPBTAMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}));
         return executeCallWithSingleValueReturn(function, BigInteger.class);
     }
 
     public Function getMethodTpBtaMapRawFunction(byte[] param0) throws ContractException {
-        final Function function = new Function(FUNC_TPBTAMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)), 
+        final Function function = new Function(FUNC_TPBTAMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Bytes32(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Uint256>() {}));
         return function;
     }
 
     public TransactionReceipt transferOwnership(String newOwner) {
         final Function function = new Function(
-                FUNC_TRANSFEROWNERSHIP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)), 
+                FUNC_TRANSFEROWNERSHIP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodTransferOwnershipRawFunction(String newOwner) throws
             ContractException {
-        final Function function = new Function(FUNC_TRANSFEROWNERSHIP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)), 
+        final Function function = new Function(FUNC_TRANSFEROWNERSHIP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForTransferOwnership(String newOwner) {
         final Function function = new Function(
-                FUNC_TRANSFEROWNERSHIP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)), 
+                FUNC_TRANSFEROWNERSHIP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String transferOwnership(String newOwner, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_TRANSFEROWNERSHIP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)), 
+                FUNC_TRANSFEROWNERSHIP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.Address(newOwner)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public Tuple1<String> getTransferOwnershipInput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_TRANSFEROWNERSHIP, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_TRANSFEROWNERSHIP,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<String>(
@@ -853,40 +853,40 @@ public class PtcHub extends Contract {
 
     public TransactionReceipt updatePTCTrustRoot(byte[] rawPtcTrustRoot) {
         final Function function = new Function(
-                FUNC_UPDATEPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)), 
+                FUNC_UPDATEPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodUpdatePTCTrustRootRawFunction(byte[] rawPtcTrustRoot) throws
             ContractException {
-        final Function function = new Function(FUNC_UPDATEPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)), 
+        final Function function = new Function(FUNC_UPDATEPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForUpdatePTCTrustRoot(byte[] rawPtcTrustRoot) {
         final Function function = new Function(
-                FUNC_UPDATEPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)), 
+                FUNC_UPDATEPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String updatePTCTrustRoot(byte[] rawPtcTrustRoot, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_UPDATEPTCTRUSTROOT, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)), 
+                FUNC_UPDATEPTCTRUSTROOT,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawPtcTrustRoot)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public Tuple1<byte[]> getUpdatePTCTrustRootInput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_UPDATEPTCTRUSTROOT, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_UPDATEPTCTRUSTROOT,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<byte[]>(
@@ -896,54 +896,54 @@ public class PtcHub extends Contract {
     }
 
     public String verifierMap(BigInteger param0) throws ContractException {
-        final Function function = new Function(FUNC_VERIFIERMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(param0)), 
+        final Function function = new Function(FUNC_VERIFIERMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return executeCallWithSingleValueReturn(function, String.class);
     }
 
     public Function getMethodVerifierMapRawFunction(BigInteger param0) throws ContractException {
-        final Function function = new Function(FUNC_VERIFIERMAP, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(param0)), 
+        final Function function = new Function(FUNC_VERIFIERMAP,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.generated.Uint8(param0)),
                 Arrays.<TypeReference<?>>asList(new TypeReference<Address>() {}));
         return function;
     }
 
     public TransactionReceipt verifyProof(byte[] rawTpProof) {
         final Function function = new Function(
-                FUNC_VERIFYPROOF, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)), 
+                FUNC_VERIFYPROOF,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return executeTransaction(function);
     }
 
     public Function getMethodVerifyProofRawFunction(byte[] rawTpProof) throws ContractException {
-        final Function function = new Function(FUNC_VERIFYPROOF, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)), 
+        final Function function = new Function(FUNC_VERIFYPROOF,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)),
                 Arrays.<TypeReference<?>>asList());
         return function;
     }
 
     public String getSignedTransactionForVerifyProof(byte[] rawTpProof) {
         final Function function = new Function(
-                FUNC_VERIFYPROOF, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)), 
+                FUNC_VERIFYPROOF,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return createSignedTransaction(function);
     }
 
     public String verifyProof(byte[] rawTpProof, TransactionCallback callback) {
         final Function function = new Function(
-                FUNC_VERIFYPROOF, 
-                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)), 
+                FUNC_VERIFYPROOF,
+                Arrays.<Type>asList(new org.fisco.bcos.sdk.v3.codec.datatypes.DynamicBytes(rawTpProof)),
                 Collections.<TypeReference<?>>emptyList(), 0);
         return asyncExecuteTransaction(function, callback);
     }
 
     public Tuple1<byte[]> getVerifyProofInput(TransactionReceipt transactionReceipt) {
         String data = transactionReceipt.getInput().substring(10);
-        final Function function = new Function(FUNC_VERIFYPROOF, 
-                Arrays.<Type>asList(), 
+        final Function function = new Function(FUNC_VERIFYPROOF,
+                Arrays.<Type>asList(),
                 Arrays.<TypeReference<?>>asList(new TypeReference<DynamicBytes>() {}));
         List<Type> results = this.functionReturnDecoder.decode(data, function.getOutputParameters());
         return new Tuple1<byte[]>(

@@ -19,6 +19,8 @@ package com.alipay.antchain.bridge.plugins.mychain;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.security.PrivateKey;
+import java.util.Arrays;
+import java.util.HashSet;
 
 import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.util.HexUtil;
@@ -33,6 +35,7 @@ import com.alipay.antchain.bridge.commons.core.bta.IBlockchainTrustAnchor;
 import com.alipay.antchain.bridge.commons.utils.crypto.SignAlgoEnum;
 import com.alipay.antchain.bridge.plugins.mychain.crypto.CryptoSuiteEnum;
 import com.alipay.antchain.bridge.plugins.mychain.model.ContractAddressInfo;
+import com.alipay.antchain.bridge.plugins.mychain.model.ConsensusNodeInfo;
 import com.alipay.antchain.bridge.plugins.mychain.model.MychainSubjectIdentity;
 import com.alipay.antchain.bridge.plugins.spi.ptc.core.VerifyResult;
 import lombok.extern.slf4j.Slf4j;
@@ -130,6 +133,62 @@ public class MychainHcdvsServiceTest {
         VerifyResult result = mychainHcdvsService.verifyConsensusState(currentState, anchorState);
         Assert.assertNotNull(result);
         Assert.assertTrue(result.isSuccess());
+    }
+
+    @Test
+    public void testEvmOnlyAmIdsWithNullAndBlankAddresses() {
+        mychainHcdvsService.verifyAnchorConsensusState(mychainBta, anchorState);
+        setAmIds(anchorState, amEvm, null);
+        setAmIds(currentState, null, amEvm, "", "   ");
+        VerifyResult result = mychainHcdvsService.verifyConsensusState(currentState, anchorState);
+        Assert.assertTrue(result.getErrorMsg(), result.isSuccess());
+        Assert.assertEquals(new HashSet<>(Arrays.asList(amEvm)),
+                ConsensusNodeInfo.decode(currentState.getConsensusNodeInfo()).getAmContractIds());
+    }
+
+    @Test
+    public void testDualVmAmIdsIgnoreMissingAddressEntries() {
+        mychainHcdvsService.verifyAnchorConsensusState(mychainBta, anchorState);
+        setAmIds(anchorState, amEvm, amWasm, null);
+        setAmIds(currentState, amWasm, null, amEvm, "");
+        Assert.assertTrue(mychainHcdvsService.verifyConsensusState(currentState, anchorState).isSuccess());
+    }
+
+    @Test
+    public void testChangedNonEmptyAmIdentityIsRejected() {
+        mychainHcdvsService.verifyAnchorConsensusState(mychainBta, anchorState);
+        setAmIds(anchorState, amEvm, null);
+        setAmIds(currentState, "another-am", null);
+        VerifyResult result = mychainHcdvsService.verifyConsensusState(currentState, anchorState);
+        Assert.assertFalse(result.isSuccess());
+        Assert.assertEquals("am contract ids not equal with parent consensus state", result.getErrorMsg());
+    }
+
+    @Test
+    public void testEmptyAmIdentitiesAreRejectedEvenWhenBothSidesMatch() {
+        mychainHcdvsService.verifyAnchorConsensusState(mychainBta, anchorState);
+        setAmIds(anchorState, null, "");
+        setAmIds(currentState, "   ", null);
+        VerifyResult result = mychainHcdvsService.verifyConsensusState(currentState, anchorState);
+        Assert.assertFalse(result.isSuccess());
+        Assert.assertEquals("am contract ids are empty", result.getErrorMsg());
+    }
+
+    @Test
+    public void testMissingCurrentAmIdCollectionIsRejected() {
+        mychainHcdvsService.verifyAnchorConsensusState(mychainBta, anchorState);
+        ConsensusNodeInfo info = ConsensusNodeInfo.decode(currentState.getConsensusNodeInfo());
+        info.setAmContractIds(null);
+        currentState.setConsensusNodeInfo(info.encode());
+        VerifyResult result = mychainHcdvsService.verifyConsensusState(currentState, anchorState);
+        Assert.assertFalse(result.isSuccess());
+        Assert.assertEquals("am contract ids are empty", result.getErrorMsg());
+    }
+
+    private void setAmIds(ConsensusState state, String... ids) {
+        ConsensusNodeInfo info = ConsensusNodeInfo.decode(state.getConsensusNodeInfo());
+        info.setAmContractIds(new HashSet<>(Arrays.asList(ids)));
+        state.setConsensusNodeInfo(info.encode());
     }
 
     @Test

@@ -1,0 +1,142 @@
+import IAuthMessage;
+import ISubProtocol;
+import IPtcHub;
+import AMLib;
+import Utils;
+
+contract AuthMsg implements IAuthMessage.AuthMessageInterface {
+
+    struct SubProtocol {
+        uint32 protocolType;
+        uint64 protocolID;
+        address protocolAddress;
+        bool exist;
+    }
+
+    @global address owner;
+    @global address relayer;
+    @global uint64 ptcHubId;
+    @global address ptcHubAddress;
+
+    @global map<address, SubProtocol> subProtocols;
+    @global map<uint32, address> protocolRoutes;
+    @global map<uint32, uint64> protocolIDs;
+
+    @global AMLib.AuthMessage decodeAuthMsg;
+
+    @global function on_deploy(address _owner, address _relayer) {
+        owner = _owner;
+        relayer = _relayer;
+
+        __debug.print("[on_deploy] AuthMsg deployed - address:", __address(), " id:", __id());
+        __debug.print("[on_deploy] Owner:", owner, " Relayer:", relayer);
+    }
+
+    @address function setRelayer(address _relayer) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_relayer){
+            relayer = _relayer;
+        }
+    }
+
+    @address function setPtcHub(uint64 _ptcHubId, address _ptcHubAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_ptcHubId, ^_ptcHubAddress) {
+            ptcHubId = _ptcHubId;
+            ptcHubAddress = _ptcHubAddress;
+        }
+    }
+
+    @address function setProtocol(uint64 protocolID, address protocolAddress, uint32 protocolType) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        __debug.assert(!subProtocols[protocolAddress].exist);
+
+        relay@global (^protocolID, ^protocolAddress, ^protocolType) {
+            SubProtocol p;
+            p.exist = true;
+            p.protocolType = protocolType;
+            p.protocolID = protocolID;
+            p.protocolAddress = protocolAddress;
+            subProtocols[protocolAddress] = p;
+            protocolRoutes[protocolType] = protocolAddress;
+            protocolIDs[protocolType] = protocolID;
+
+            relay@external SubProtocolUpdate(protocolType, protocolID, protocolAddress);
+            __debug.print("[Event] SubProtocolUpdate - type:", protocolType, " id:", protocolID, " address:", protocolAddress);
+        }
+    }
+
+    // GCL 特定函数：设置协议并保存其 ID 以便接口调用
+    @global function setProtocolWithID(uint64 protocolID, address protocolAddress, uint32 protocolType) public export {
+        __debug.assert(!subProtocols[protocolAddress].exist);
+
+        SubProtocol p;
+        p.exist = true;
+        p.protocolType = protocolType;
+        p.protocolID = protocolID;
+        p.protocolAddress = protocolAddress;
+        subProtocols[protocolAddress] = p;
+        protocolRoutes[protocolType] = protocolAddress;
+        protocolIDs[protocolType] = protocolID;
+        __debug.print("[setProtocolWithID] Protocol registered - type:", protocolType, " id:", protocolID, " address:", protocolAddress);
+        __debug.print("[Event] SubProtocolUpdate - type:", protocolType, " id:", protocolID);
+    }
+
+    @global function recvFromProtocol(uint64 senderID, array<uint8> message) public export {
+        address protocol = __transaction.get_sender();
+        __debug.assert(subProtocols[protocol].exist);
+
+        // use version 1 for now
+        AMLib.AuthMessage amV1;
+        amV1.version = 1u32;
+        amV1.author = Utils.uint256ToBytes32(uint256(senderID));
+        amV1.protocolType = subProtocols[protocol].protocolType;
+        amV1.body = Utils.bytesCopy(message);
+
+        array<uint8> AMMsg = AMLib.encodeAuthMessage(amV1);
+        __debug.print("[recvFromProtocol] AuthMsg encoded: ", AMMsg);
+        relay@external SendAuthMessage(AMMsg);
+    }
+
+    @address function recvPkgFromRelayer(array<uint8> pkg) public export {
+        __debug.assert(__transaction.get_sender() == relayer);
+
+        __debug.print("[recvPkgFromRelayer] Received UCP package, length: ", pkg.length());
+        __debug.print("[recvPkgFromRelayer] First 20 bytes: ", pkg);
+
+        // 1. 解码 MessageFromRelayer，获取 senderDomain 和 rawResp (AuthMessage bytes)
+        __debug.print("[recvPkgFromRelayer] About to call AMLib.decodeMessageFromRelayer");
+        AMLib.DecodeResult dr = AMLib.decodeMessageFromRelayer(pkg);
+        __debug.print("[recvPkgFromRelayer] AMLib.decodeMessageFromRelayer completed");
+        __debug.print("[recvPkgFromRelayer] senderDomain: ", dr.senderDomain);
+        __debug.print("[recvPkgFromRelayer] rawResp length: ", dr.rawResp.length());
+
+        // 2. 解码 AuthMessage
+        AMLib.AuthMessage msg = AMLib.decodeAuthMessage(dr.rawResp);
+        __debug.print("[recvPkgFromRelayer] Decoded AuthMessage: ", msg);
+
+        // recvPkgFromRelayer 是 address scope。所有 global 状态读取和写入必须
+        // 放进同一个 global relay；直接在 address scope 读取 protocolRoutes 会让
+        // Dioxide 运行时以 address key 打开 global state，并在提交区块时触发
+        // SCOPE_VERIFY_KEY_SIZE 断言。
+        relay@global (^msg, ^dr) {
+            decodeAuthMsg = msg;
+
+            // 3. 验证协议路由存在
+            address zeroAddress;
+            __debug.assert(protocolRoutes[msg.protocolType] != zeroAddress);
+
+            // 4. 调用上层协议（SDPMsg）的 recvMessage, 触发接收事件
+            __debug.assert(ptcHubId != 0u64);
+            IPtcHub.PtcHubInterface ptcHub = IPtcHub.PtcHubInterface(ptcHubId);
+            ptcHub.verifyProof(dr.rawTpProof);
+
+            uint64 protocolID = protocolIDs[msg.protocolType];
+            ISubProtocol.SubProtocolInterface sdp = ISubProtocol.SubProtocolInterface(protocolID);
+            sdp.recvMessage(dr.senderDomain, msg.author, msg.body);
+
+            relay@external recvAuthMessage(dr.senderDomain, dr.rawResp);
+            __debug.print("[recvPkgFromRelayer] Message routed successfully");
+        }
+    }
+}

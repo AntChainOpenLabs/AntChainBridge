@@ -1,16 +1,13 @@
 package com.alipay.antchain.bridge.plugins.ethereum2;
 
 import java.math.BigInteger;
-import java.util.Arrays;
 
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.alipay.antchain.bridge.commons.core.base.ConsensusState;
 import com.alipay.antchain.bridge.commons.core.base.CrossChainMessage;
 import com.alipay.antchain.bridge.commons.core.bta.IBlockchainTrustAnchor;
-import com.alipay.antchain.bridge.plugins.ethereum2.abi.AuthMsg;
 import com.alipay.antchain.bridge.plugins.ethereum2.core.*;
-import com.alipay.antchain.bridge.plugins.ethereum2.core.eth.EthLogTopic;
 import com.alipay.antchain.bridge.plugins.ethereum2.core.eth.EthReceiptProof;
 import com.alipay.antchain.bridge.plugins.lib.HeteroChainDataVerifierService;
 import com.alipay.antchain.bridge.plugins.spi.ptc.AbstractHCDVSService;
@@ -18,14 +15,11 @@ import com.alipay.antchain.bridge.plugins.spi.ptc.core.VerifyResult;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.datatypes.Address;
-import org.web3j.tx.Contract;
 import org.web3j.utils.Numeric;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 
 @HeteroChainDataVerifierService(pluginId = "plugin-ethereum2", products = "ethereum2")
 public class EthereumHcdvsService extends AbstractHCDVSService {
-
-    private static final EthLogTopic SEND_AUTH_MESSAGE_LOG_TOPIC = EthLogTopic.fromHexString("0x79b7516b1b7a6a39fb4b7b22e8667cd3744e5c27425292f8a9f49d1042c0c651");
 
     @Override
     public VerifyResult verifyAnchorConsensusState(IBlockchainTrustAnchor bta, ConsensusState anchorState) {
@@ -181,38 +175,18 @@ public class EthereumHcdvsService extends AbstractHCDVSService {
             return VerifyResult.fail("receipt root not equal");
         }
 
-        var ethAuthMessageLog = EthAuthMessageLog.decodeFromJson(new String(message.getProvableData().getLedgerData()));
-        var receiptInProof = ethReceiptProof.getEthTransactionReceipt();
-        if (receiptInProof.getLogs().size() <= ethAuthMessageLog.getLogIndex()) {
-            getHCDVSLogger().error("❌ log index {} out of range, receipt has only {} logs", ethAuthMessageLog.getLogIndex(), receiptInProof.getLogs().size());
-            return VerifyResult.fail("log index out of range");
-        }
-
-        var msgLogInProof = ethReceiptProof.getEthTransactionReceipt().getLogs().get(ethAuthMessageLog.getLogIndex());
-        var msgLogInLedgerData = ethAuthMessageLog.getSendAuthMessageLog();
-
-        if (!SEND_AUTH_MESSAGE_LOG_TOPIC.equals(msgLogInProof.getTopics().getFirst())) {
-            getHCDVSLogger().error("❌ log topic in proof {} not match", msgLogInProof.getTopics().getFirst().toHexString());
-            return VerifyResult.fail("log topic not match");
-        }
-        if (!Arrays.equals(SEND_AUTH_MESSAGE_LOG_TOPIC.toArray(), Numeric.hexStringToByteArray(msgLogInLedgerData.getTopics().getFirst()))) {
-            getHCDVSLogger().error("❌ log topic in ledger data {} not match", msgLogInLedgerData.getTopics().getFirst());
-            return VerifyResult.fail("log topic not match");
-        }
-        if (!msgLogInProof.getLogger().equals(ethConsensusStateData.getAmContract())) {
-            getHCDVSLogger().error("❌ logger address in proof {} is not am contract {}",
-                    msgLogInProof.getLogger().toHexString(), ethConsensusStateData.getAmContract().toHexString());
-            return VerifyResult.fail("logger not am contract");
-        }
-        if (!Arrays.equals(ethConsensusStateData.getAmContract().toArray(), Numeric.hexStringToByteArray(msgLogInLedgerData.getAddress()))) {
-            getHCDVSLogger().error("❌ logger address {} in ledger data is not am contract {}",
-                    msgLogInLedgerData.getAddress(), ethConsensusStateData.getAmContract().toHexString());
-            return VerifyResult.fail("logger not am contract");
-        }
-        if (!Arrays.equals(msgLogInProof.getData().toArray(), Numeric.hexStringToByteArray(msgLogInLedgerData.getData()))) {
-            getHCDVSLogger().error("❌ log data in proof {} is not equal to ledger data {}",
-                    msgLogInProof.getData().toHexString(), msgLogInLedgerData.getData());
-            return VerifyResult.fail("log data not match");
+        try {
+            var ledgerLog = EthAuthMessageLog.decodeFromJson(new String(message.getProvableData().getLedgerData()));
+            if (ledgerLog == null || ledgerLog.getSendAuthMessageLog() == null
+                    || !BigInteger.valueOf(ethReceiptProof.getReceiptIndex()).equals(
+                            ledgerLog.getSendAuthMessageLog().getTransactionIndex())) {
+                return VerifyResult.fail("receipt transaction index does not match ledger event");
+            }
+            ledgerLog.verifyReceiptLog(ethReceiptProof.getEthTransactionReceipt().getLogs(),
+                    ethConsensusStateData.getAmContract(), message.getMessage());
+        } catch (RuntimeException e) {
+            // Malformed/ambiguous ledger data must fail verification, never fall back to RPC or success.
+            return VerifyResult.fail("invalid receipt event: {}", e.getMessage());
         }
 
         getHCDVSLogger().info("🌈 crosschain message (slot: {}, txhash: {}) pass the verification",
@@ -223,10 +197,6 @@ public class EthereumHcdvsService extends AbstractHCDVSService {
 
     @Override
     public byte[] parseMessageFromLedgerData(byte[] ledgerData) {
-        var eventValues = Contract.staticExtractEventParameters(
-                AuthMsg.SENDAUTHMESSAGE_EVENT,
-                EthAuthMessageLog.decodeFromJson(new String(ledgerData)).getSendAuthMessageLog()
-        );
-        return (byte[]) eventValues.getNonIndexedValues().getFirst().getValue();
+        return EthAuthMessageLog.decodeFromJson(new String(ledgerData)).decodeMessage();
     }
 }

@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: committee-ptc
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/committee_node?serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    password: YOUR_PWD
+    username: root
+logging:
+  file:
+    path: ./logs
+  level:
+    app: INFO
+# setting for committee
+committee:
+  id: default
+  node:
+    id: monitor-node
+    credential:
+      sign-algo: "Keccak256WithSecp256k1"
+      private-key-file: "file:private_key.pem"
+      cert-file: "file:ptc.crt"
+  plugin:
+    # where to load the hetero-chain plugins
+    repo: ./plugins
+    policy:
+      # limit actions of the plugin classloader
+      classloader:
+        resource:
+          ban-with-prefix:
+            # the plugin classloader will not read the resource file starting with the prefix below
+            APPLICATION: "META-INF/services/io.grpc."
+grpc:
+  server:
+    port: 10081
+    security:
+      # enable tls mode
+      enabled: true
+      # server certificate
+      certificate-chain: file:tls_certs/server.crt
+      # server key
+      private-key: file:tls_certs/server.key
+      # Mutual Certificate Authentication
+      trustCertCollection: file:tls_certs/trust.crt
+      # clientAuth: REQUIRE
+  clients:
+    # monitor system
+    monitor-system:
+      host: localhost
+      port: 50051
+      security:
+        monitorSystemCert: file:tls_certs/monitor-system.crt
+    # ps-server
+    plugin-server:
+      host: localhost
+      port: 9090
+      ps-id: ps01
+      security:
+        certificate-chain: file:tls_certs/server.crt
+        private-key: file:tls_certs/server.key
+        pluginServerCert: file:tls_certs/pluginServer.crt

@@ -1,0 +1,14 @@
+{
+  "mychain_primary": "127.0.0.1 18130",
+  "mychain_sslKey": "",
+  "mychain_sslKeyPass": "",
+  "mychain_sslCert": "",
+  "mychain_trustStore": "",
+  "mychain_trustStorePassword": "",
+  "mychain_anchor_account": "",
+  "mychain_anchor_account_pri_key": "",
+  "mychain_anchor_account_pub_key": "",
+  "mychain_anchor_account_subnet_id": "00000000",
+  "wasm": "true",
+  "bcdns_root_cert_pem": ""
+}

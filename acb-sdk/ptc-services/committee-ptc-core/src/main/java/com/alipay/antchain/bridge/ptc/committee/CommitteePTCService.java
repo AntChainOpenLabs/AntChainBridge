@@ -40,11 +40,13 @@ import com.alipay.antchain.bridge.ptc.committee.types.basic.EndorseBlockStateRes
 import com.alipay.antchain.bridge.ptc.committee.types.network.EndpointInfo;
 import com.alipay.antchain.bridge.ptc.committee.types.network.nodeclient.HeartbeatResp;
 import com.alipay.antchain.bridge.ptc.committee.types.network.nodeclient.Node;
+import com.alipay.antchain.bridge.ptc.committee.types.network.nodeclient.NodeVerifyCrossChainMessageResult;
 import com.alipay.antchain.bridge.ptc.committee.types.tpbta.CommitteeEndorseRoot;
 import com.alipay.antchain.bridge.ptc.committee.types.tpbta.NodeEndorseInfo;
 import com.alipay.antchain.bridge.ptc.committee.types.tpbta.OptionalEndorsePolicy;
 import com.alipay.antchain.bridge.ptc.service.IPTCService;
 import com.alipay.antchain.bridge.ptc.types.PtcFeatureDescriptor;
+import com.alipay.antchain.bridge.ptc.types.PTCVerifyCrossChainMessageResult;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -333,6 +335,25 @@ public class CommitteePTCService implements IPTCService {
      */
     @Override
     public ThirdPartyProof verifyCrossChainMessage(ThirdPartyBlockchainTrustAnchor tpbta, ValidatedConsensusState validatedConsensusState, UniformCrosschainPacket ucp) {
+        return verifyCrossChainMessageWithResult(tpbta, validatedConsensusState, ucp).getThirdPartyProof();
+    }
+
+    @Override
+    public PTCVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            ThirdPartyBlockchainTrustAnchor tpbta,
+            ValidatedConsensusState validatedConsensusState,
+            UniformCrosschainPacket ucp
+    ) {
+        return verifyCrossChainMessageWithResult(tpbta, validatedConsensusState, ucp, "");
+    }
+
+    @Override
+    public PTCVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            ThirdPartyBlockchainTrustAnchor tpbta,
+            ValidatedConsensusState validatedConsensusState,
+            UniformCrosschainPacket ucp,
+            String ucpId
+    ) {
         try {
             CommitteeEndorseRoot root = CommitteeEndorseRoot.decode(tpbta.getEndorseRoot());
             List<String> requiredNodeIds = root.getEndorsers().stream()
@@ -346,26 +367,34 @@ public class CommitteePTCService implements IPTCService {
 
             checkNodes(requiredNodeIds, optionalNodeIds, root.getPolicy());
 
-            List<Future<CommitteeNodeProof>> resFutureList = reqExecutorService.invokeAll(
+            List<Future<NodeVerifyCrossChainMessageResult>> resFutureList = reqExecutorService.invokeAll(
                     nodeMap.entrySet().stream()
                             .filter(entry -> entry.getValue().isAvailable())
                             .filter(
                                     entry -> requiredNodeIds.contains(entry.getValue().getEndpointInfo().getNodeId())
                                             || optionalNodeIds.contains(entry.getValue().getEndpointInfo().getNodeId())
                             ).map(
-                                    entry -> (Callable<CommitteeNodeProof>) () -> {
+                                    entry -> (Callable<NodeVerifyCrossChainMessageResult>) () -> {
                                         log.debug("Verify crosschain msg with node {} {}", entry.getKey(), entry.getValue().getEndpointInfo().getEndpoint().getUrl());
-                                        return entry.getValue().getNodeClient().verifyCrossChainMessage(tpbta.getCrossChainLane(), ucp);
+                                        return entry.getValue().getNodeClient().verifyCrossChainMessageWithResult(tpbta.getCrossChainLane(), ucp, ucpId);
                                     }
                             ).collect(Collectors.toList())
             );
-            List<CommitteeNodeProof> resList = collectNodeProof(resFutureList);
+            List<NodeVerifyCrossChainMessageResult> nodeResults = collectNodeVerifyResults(resFutureList);
+            List<CommitteeNodeProof> resList = nodeResults.stream()
+                    .map(NodeVerifyCrossChainMessageResult::getNodeProof)
+                    .collect(Collectors.toList());
             CommitteeEndorseProof proof = new CommitteeEndorseProof();
             ThirdPartyProof tpProof = assembleTpProof(tpbta, resList, ucp.getSrcMessage().getMessage(), proof);
 
             checkEndorsementsOrThrow(requiredNodeIds, optionalNodeIds, root.getPolicy(), proof);
 
-            return tpProof;
+            NodeVerifyCrossChainMessageResult regulationResult = selectRegulationResult(nodeResults);
+            return new PTCVerifyCrossChainMessageResult(
+                    tpProof,
+                    ObjectUtil.isNull(regulationResult) ? "" : regulationResult.getRegulationStatus(),
+                    ObjectUtil.isNull(regulationResult) ? "" : regulationResult.getRegulationReason()
+            );
         } catch (CommitteeBaseException e) {
             throw e;
         } catch (Throwable t) {
@@ -652,15 +681,24 @@ public class CommitteePTCService implements IPTCService {
     }
 
     private ValidatedConsensusState collectValidatedConsensusStateResults(List<Future<ValidatedConsensusState>> resFutureList) {
-        List<ValidatedConsensusState> resList = resFutureList.stream().map(
-                future -> {
+        List<ValidatedConsensusState> resList = resFutureList.stream()
+                .map(future -> {
                     try {
                         return future.get();
                     } catch (Exception e) {
-                        throw new RuntimeException("failed to collect node proof from future object: ", e);
+                        // A committee may contain optional nodes that are temporarily unavailable
+                        // or lag behind the required nodes. Their failed futures must not abort the
+                        // whole round before the endorsement policy is evaluated below. Required
+                        // node failures are still rejected by checkEndorsementsOrThrow because the
+                        // resulting proof will be missing their signatures.
+                        log.warn("failed to collect a validated consensus state from committee node; "
+                                + "continue with successful endorsements and enforce the TpBTA policy: {}",
+                                e.getMessage());
+                        return null;
                     }
-                }
-        ).collect(Collectors.toList());
+                })
+                .filter(ObjectUtil::isNotNull)
+                .collect(Collectors.toList());
         if (ObjectUtil.isEmpty(resList)) {
             throw new RuntimeException(
                     StrUtil.format("none endorsements received with {} nodes active",
@@ -691,10 +729,12 @@ public class CommitteePTCService implements IPTCService {
                     try {
                         return future.get();
                     } catch (Exception e) {
-                        throw new RuntimeException("failed to collect node proof from future object: ", e);
+                        log.warn("failed to collect a committee node proof; continue with successful "
+                                + "endorsements and enforce the TpBTA policy: {}", e.getMessage());
+                        return null;
                     }
                 }
-        ).collect(Collectors.toList());
+        ).filter(ObjectUtil::isNotNull).collect(Collectors.toList());
         if (ObjectUtil.isEmpty(resList)) {
             throw new RuntimeException(
                     StrUtil.format("none endorsements received with {} nodes active",
@@ -702,6 +742,74 @@ public class CommitteePTCService implements IPTCService {
             );
         }
         return resList;
+    }
+
+    private List<NodeVerifyCrossChainMessageResult> collectNodeVerifyResults(
+            List<Future<NodeVerifyCrossChainMessageResult>> resultFutures
+    ) {
+        List<NodeVerifyCrossChainMessageResult> results = resultFutures.stream().map(
+                future -> {
+                    try {
+                        return future.get();
+                    } catch (Exception e) {
+                        // Optional committee nodes may not have indexed the requested consensus
+                        // state yet. Keep the successful results here and let
+                        // checkEndorsementsOrThrow enforce required endorsers and the optional
+                        // threshold. This is the same policy used when collecting consensus states.
+                        log.warn("failed to collect a committee node verification result; continue "
+                                + "with successful endorsements and enforce the TpBTA policy: {}",
+                                e.getMessage());
+                        return null;
+                    }
+                }
+        ).filter(ObjectUtil::isNotNull).collect(Collectors.toList());
+        if (ObjectUtil.isEmpty(results)) {
+            throw new RuntimeException(
+                    StrUtil.format("none endorsements received with {} nodes active",
+                            config.getCommitteeNetworkInfo().getCommitteeId(), getAvailableNodesCount())
+            );
+        }
+        return results;
+    }
+
+    private NodeVerifyCrossChainMessageResult selectRegulationResult(
+            List<NodeVerifyCrossChainMessageResult> results
+    ) {
+        List<NodeVerifyCrossChainMessageResult> regulationResults = results.stream()
+                .filter(result -> StrUtil.isNotEmpty(result.getRegulationStatus()))
+                .collect(Collectors.toList());
+        if (regulationResults.isEmpty()) {
+            return null;
+        }
+        int priority = regulationResults.stream()
+                .mapToInt(result -> regulationStatusPriority(result.getRegulationStatus()))
+                .min()
+                .orElse(2);
+        NodeVerifyCrossChainMessageResult selected = regulationResults.stream()
+                .filter(result -> regulationStatusPriority(result.getRegulationStatus()) == priority)
+                .findFirst()
+                .orElse(regulationResults.get(0));
+        String reasons = regulationResults.stream()
+                .filter(result -> regulationStatusPriority(result.getRegulationStatus()) == priority)
+                .map(NodeVerifyCrossChainMessageResult::getRegulationReason)
+                .filter(StrUtil::isNotEmpty)
+                .distinct()
+                .collect(Collectors.joining("; "));
+        return new NodeVerifyCrossChainMessageResult(
+                selected.getNodeProof(),
+                selected.getRegulationStatus(),
+                reasons
+        );
+    }
+
+    private int regulationStatusPriority(String status) {
+        if (StrUtil.equalsIgnoreCase("rejected", status)) {
+            return 0;
+        }
+        if (StrUtil.equalsIgnoreCase("error", status)) {
+            return 1;
+        }
+        return 2;
     }
 
     @SuppressWarnings("all")

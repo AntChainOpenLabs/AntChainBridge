@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <id>plugin</id>
+    <formats><format>jar</format></formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <dependencySets>
+        <!-- The SDK is a fat JAR. Keep its deployed Guava classes first;
+             external Guava supplies only classes absent from that SDK. -->
+        <dependencySet>
+            <outputDirectory>/</outputDirectory><unpack>true</unpack>
+            <useProjectArtifact>false</useProjectArtifact><scope>runtime</scope>
+            <includes><include>com.alipay.mychainx:mychainx-sdk-java-sm</include></includes>
+            <unpackOptions><includes>
+                <include>com/google/common/**</include>
+                <include>com/google/thirdparty/**</include>
+                <include>META-INF/maven/com.google.guava/guava/**</include>
+            </includes></unpackOptions>
+        </dependencySet>
+        <dependencySet>
+            <outputDirectory>/</outputDirectory><unpack>true</unpack>
+            <useProjectArtifact>true</useProjectArtifact><scope>runtime</scope>
+        </dependencySet>
+    </dependencySets>
+</assembly>

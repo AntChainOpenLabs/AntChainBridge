@@ -1,0 +1,50 @@
+// Schema AuthMsg
+namespace Crosschain.AuthMsgSpace;
+
+attribute "map";
+
+table AuthMsgSchema {
+  contract_admins:[Authentic](map); // key: Identity
+  allowed_relayers:[RelayerInfo](map); // key: Identity
+  relayer_list:[RelayerIdentity];
+  allowed_protocols:[ProtocolInfo](map); // key: Identity
+  protocol_routes:[RouteInfo](map); // key: to_string(uint32)
+  domain_parse_info:[DomainParseInfo](map);
+
+  myoracle_contract:string; // Identity
+  myoracle_service:string; // string
+
+  cached_auth_msgs:[CachedMsg](map); // key: msg hash, value: msg. For mycloak cache msg
+
+  ptc_hub_contract: string; // Identity
+}
+
+table CachedMsg {
+  auth_msg:string;
+}
+
+table Authentic {
+  holder:bool = true;
+}
+
+table RelayerInfo {
+  holder:bool = true;
+}
+
+table RelayerIdentity {
+  relayer_id:string;
+}
+
+table ProtocolInfo {
+  protocol_type:uint32;
+}
+
+table RouteInfo {
+  protocol_id:string; // Identity
+}
+
+table DomainParseInfo {
+  contract_id:string; // Identity
+}
+
+root_type AuthMsgSchema;

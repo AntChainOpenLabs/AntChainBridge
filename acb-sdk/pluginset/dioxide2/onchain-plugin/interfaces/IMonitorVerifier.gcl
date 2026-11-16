@@ -1,0 +1,11 @@
+contract IMonitorVerifier {
+    interface MonitorVerifierInterface {
+        @address function setPtcHub(address _ptcHubAddress) public export;
+
+        @address function setMonitor(address _monitorAddress) public export;
+
+        @global function receiveMonitorNodeProof(array<uint8> signature) public;
+
+        @global function bool verifyMonitorNodeProofMessage() public;
+    }
+}

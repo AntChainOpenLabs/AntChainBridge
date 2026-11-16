@@ -1,0 +1,637 @@
+{
+  "description": "2026-10-21 deployed Linux x86_64 Mychain production dependency baseline; application classes are deliberately excluded.",
+  "artifacts": {
+    "mychain010-bbc-1.0.0-SNAPSHOT-plugin.jar": {
+      "dependencies": {
+        "com.alipay.antchain.bridge:antchain-bridge-commons": [
+          "1.0.0-SNAPSHOT"
+        ],
+        "com.fasterxml.jackson.core:jackson-databind": [
+          "2.9.10.7"
+        ],
+        "com.google.protobuf:protobuf-java": [
+          "3.5.1"
+        ],
+        "org.apache.httpcomponents:httpclient": [
+          "4.5.13"
+        ],
+        "com.squareup.okio:okio": [
+          "1.6.0"
+        ],
+        "com.lambdaworks:scrypt": [
+          "1.4.0"
+        ],
+        "com.google.code.gson:gson": [
+          "2.8.0"
+        ],
+        "com.alibaba:fastjson": [
+          "1.2.83_noneautotype"
+        ],
+        "net.i2p.crypto:eddsa": [
+          "0.1.0"
+        ],
+        "com.alipay.antchain.bridge:antchain-bridge-spi": [
+          "1.0.0-SNAPSHOT"
+        ],
+        "com.alipay.antchain.bridge:antchain-bridge-plugin-lib": [
+          "1.0.0-SNAPSHOT"
+        ],
+        "com.fasterxml.jackson.core:jackson-annotations": [
+          "2.9.10"
+        ],
+        "com.fasterxml.jackson.core:jackson-core": [
+          "2.9.10"
+        ],
+        "org.apache.commons:commons-lang3": [
+          "3.8.1"
+        ],
+        "com.alipay.mychainx:mychainx-sdk": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-protocol": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "org.jetbrains:annotations": [
+          "13.0"
+        ],
+        "com.alipay.mychainx:mychainx-rlp": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-utils": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-exception": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "org.slf4j:slf4j-api": [
+          "1.7.25"
+        ],
+        "commons-io:commons-io": [
+          "2.6"
+        ],
+        "com.google.guava:guava": [
+          "33.0.0-jre"
+        ],
+        "com.google.guava:failureaccess": [
+          "1.0.2"
+        ],
+        "com.google.guava:listenablefuture": [
+          "9999.0-empty-to-avoid-conflict-with-guava"
+        ],
+        "com.google.code.findbugs:jsr305": [
+          "3.0.2"
+        ],
+        "com.google.errorprone:error_prone_annotations": [
+          "2.23.0"
+        ],
+        "com.google.j2objc:j2objc-annotations": [
+          "2.8"
+        ],
+        "com.alipay.mychainx:mychainx-domain": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-crypto": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-vm": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "org.apache.commons:commons-collections4": [
+          "4.2"
+        ],
+        "com.alipay.mychainx:mychainx-trie": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-bloom": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.antchain:unionsdk-java-btn": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-network": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-utils": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-env": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-exception": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-codec": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-domain": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-callback": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-event": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-crypto": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-btn-protobuf": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-timertask": [
+          "1.1.1"
+        ],
+        "com.alipay.mychainx:mychainx-task": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-env": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-codec": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-callback": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-network": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychain.zoro:zoro-sdk": [
+          "0.0.4"
+        ],
+        "io.netty:netty-tcnative-classes": [
+          "2.0.61.Final"
+        ],
+        "io.netty:netty-tcnative-openssl-static": [
+          "2.0.61.Final"
+        ],
+        "io.netty:netty-buffer": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-handler": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-xml": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-classes-epoll": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-classes-kqueue": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-resolver": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-resolver-dns": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-haproxy": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-smtp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-stomp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-dns": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-http": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-redis": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-udt": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-resolver-dns-classes-macos": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-memcache": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-mqtt": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-handler-proxy": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-handler-ssl-ocsp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-rxtx": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-sctp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-common": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-all": [
+          "4.1.100.Final"
+        ],
+        "org.jctools:jctools-core": [
+          "3.1.0"
+        ],
+        "io.netty:netty-transport-native-unix-common": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-http2": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-socks": [
+          "4.1.100.Final"
+        ],
+        "org.pf4j:pf4j": [
+          "3.8.0"
+        ],
+        "com.squareup.okhttp:okhttp": [
+          "2.7.2"
+        ],
+        "cn.bitfactory:bid-sdk": [
+          "1.0.2"
+        ],
+        "commons-collections:commons-collections": [
+          "3.2.2"
+        ],
+        "cn.bitfactory:bif-chain-sdk": [
+          "1.0.2"
+        ],
+        "commons-logging:commons-logging": [
+          "1.2"
+        ],
+        "commons-codec:commons-codec": [
+          "1.11"
+        ],
+        "com.googlecode.protobuf-java-format:protobuf-java-format": [
+          "1.4"
+        ],
+        "com.github.zafarkhaja:java-semver": [
+          "0.9.0"
+        ],
+        "org.apache.httpcomponents:httpcore": [
+          "4.4.13"
+        ],
+        "org.mychain:mychain010-bbc": [
+          "1.0.0-SNAPSHOT"
+        ]
+      },
+      "classProbes": {
+        "com/google/common/collect/ImmutableList.class": "be97b7c0c6ad82dd8701996cb1aa5fd49f69eae37459b878ac7b0109d1f8bb0f",
+        "com/google/common/base/Preconditions.class": "54eb90a28553594d22fe3aa98fa4d7d21a5f64a6004480d0b84376a577bc9889",
+        "com/google/protobuf/GeneratedMessageV3.class": "92963a8d68ca015628b844bb37fc54e9752cbd7fd6518443d1f6593e1e6c87fb",
+        "com/google/protobuf/ByteString.class": "986b60d42375b131f8779cb826c8c1d29083c8d392ce819bbb212998b33815cf",
+        "org/slf4j/LoggerFactory.class": "790283427cd2e688706b46ed0e8984e595c417b5bd0752fe1ba5025963eab6dd",
+        "org/apache/commons/lang3/StringUtils.class": "3af146816d1f7e5b45398d4b957555cf5de60d0d3b92d9f7eaeb365a09bfd454",
+        "org/bouncycastle/jce/provider/BouncyCastleProvider.class": "d93ce898528717ffa6c856d8f61c8e40a7e081b8b08bb0755fca25aee102255a",
+        "io/netty/handler/ssl/SslContext.class": "43c2b3a92ddf88776e287af103c6ae822d3caf48390ecef6fde3e63662ffd56d",
+        "cn/hutool/core/util/StrUtil.class": "dbf665bfe28c1a270f4c282f75847f3bfdbf1bfc0d5970bf03d70ffdeb560814",
+        "com/alibaba/fastjson/JSON.class": "a7e9a1566fe7d688b93f04a4947fe710d335060231adc226b7bfd615d359b1b9"
+      },
+      "classFamilies": {
+        "com/google/common/": {
+          "classes": 2356,
+          "sha256": "5d2a361d48544557905eba2a28b55be385334a317426a42ee3f2cfab7f41e736"
+        },
+        "com/google/protobuf/": {
+          "classes": 699,
+          "sha256": "44d375b250f7e895ab6c34a15e9ae8dd43f0aed38247143ed32d66041ed46fc6"
+        },
+        "org/apache/commons/lang3/": {
+          "classes": 273,
+          "sha256": "c6b3156a72f975208ebb03c27ec03a57735ad27d777f22a4dc24c02098d40f3f"
+        },
+        "org/slf4j/": {
+          "classes": 34,
+          "sha256": "246f494f070cb9284fb2a11ba02f20d8235fa75f36d3571c65ebfe8b7b77642f"
+        }
+      }
+    },
+    "mychain020-bbc-1.0.0-SNAPSHOT-plugin.jar": {
+      "dependencies": {
+        "com.alipay.antchain.bridge:antchain-bridge-commons": [
+          "1.0.0-SNAPSHOT"
+        ],
+        "com.fasterxml.jackson.core:jackson-databind": [
+          "2.9.10.7"
+        ],
+        "com.google.protobuf:protobuf-java": [
+          "3.5.1"
+        ],
+        "org.apache.httpcomponents:httpclient": [
+          "4.5.13"
+        ],
+        "com.squareup.okio:okio": [
+          "1.6.0"
+        ],
+        "com.lambdaworks:scrypt": [
+          "1.4.0"
+        ],
+        "com.google.code.gson:gson": [
+          "2.8.0"
+        ],
+        "com.alibaba:fastjson": [
+          "1.2.83_noneautotype"
+        ],
+        "net.i2p.crypto:eddsa": [
+          "0.1.0"
+        ],
+        "com.alipay.antchain.bridge:antchain-bridge-spi": [
+          "1.0.0-SNAPSHOT"
+        ],
+        "com.alipay.antchain.bridge:antchain-bridge-plugin-lib": [
+          "1.0.0-SNAPSHOT"
+        ],
+        "com.fasterxml.jackson.core:jackson-annotations": [
+          "2.9.10"
+        ],
+        "com.fasterxml.jackson.core:jackson-core": [
+          "2.9.10"
+        ],
+        "org.apache.commons:commons-lang3": [
+          "3.8.1"
+        ],
+        "org.pf4j:pf4j": [
+          "3.8.0"
+        ],
+        "org.slf4j:slf4j-api": [
+          "1.7.28"
+        ],
+        "com.squareup.okhttp:okhttp": [
+          "2.7.2"
+        ],
+        "cn.bitfactory:bid-sdk": [
+          "1.0.2"
+        ],
+        "commons-collections:commons-collections": [
+          "3.2.2"
+        ],
+        "cn.bitfactory:bif-chain-sdk": [
+          "1.0.2"
+        ],
+        "com.google.guava:guava": [
+          "18.0"
+        ],
+        "commons-logging:commons-logging": [
+          "1.2"
+        ],
+        "commons-codec:commons-codec": [
+          "1.11"
+        ],
+        "com.alipay.mychainx:mychainx-sdk": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-protocol": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "org.jetbrains:annotations": [
+          "13.0"
+        ],
+        "com.alipay.mychainx:mychainx-rlp": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-utils": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-exception": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "commons-io:commons-io": [
+          "2.6"
+        ],
+        "com.google.guava:failureaccess": [
+          "1.0.2"
+        ],
+        "com.google.guava:listenablefuture": [
+          "9999.0-empty-to-avoid-conflict-with-guava"
+        ],
+        "com.google.code.findbugs:jsr305": [
+          "3.0.2"
+        ],
+        "com.google.errorprone:error_prone_annotations": [
+          "2.23.0"
+        ],
+        "com.google.j2objc:j2objc-annotations": [
+          "2.8"
+        ],
+        "com.alipay.mychainx:mychainx-domain": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-crypto": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-vm": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "org.apache.commons:commons-collections4": [
+          "4.2"
+        ],
+        "com.alipay.mychainx:mychainx-trie": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-bloom": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.antchain:unionsdk-java-btn": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-network": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-utils": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-env": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-exception": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-codec": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-domain": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-callback": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-event": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-crypto": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-btn-protobuf": [
+          "1.1.1"
+        ],
+        "com.antchain:unionsdk-timertask": [
+          "1.1.1"
+        ],
+        "com.alipay.mychainx:mychainx-task": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-env": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-codec": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-callback": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychainx:mychainx-network": [
+          "3.7.2-SNAPSHOT"
+        ],
+        "com.alipay.mychain.zoro:zoro-sdk": [
+          "0.0.4"
+        ],
+        "io.netty:netty-tcnative-classes": [
+          "2.0.61.Final"
+        ],
+        "io.netty:netty-tcnative-openssl-static": [
+          "2.0.61.Final"
+        ],
+        "io.netty:netty-buffer": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-handler": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-xml": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-classes-epoll": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-classes-kqueue": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-resolver": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-resolver-dns": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-haproxy": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-smtp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-stomp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-dns": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-http": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-redis": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-udt": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-resolver-dns-classes-macos": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-memcache": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-mqtt": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-handler-proxy": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-handler-ssl-ocsp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-rxtx": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-transport-sctp": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-common": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-all": [
+          "4.1.100.Final"
+        ],
+        "org.jctools:jctools-core": [
+          "3.1.0"
+        ],
+        "io.netty:netty-transport-native-unix-common": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-http2": [
+          "4.1.100.Final"
+        ],
+        "io.netty:netty-codec-socks": [
+          "4.1.100.Final"
+        ],
+        "com.googlecode.protobuf-java-format:protobuf-java-format": [
+          "1.4"
+        ],
+        "com.github.zafarkhaja:java-semver": [
+          "0.9.0"
+        ],
+        "org.apache.httpcomponents:httpcore": [
+          "4.4.13"
+        ],
+        "org.mychain:mychain020-bbc": [
+          "1.0.0-SNAPSHOT"
+        ]
+      },
+      "classProbes": {
+        "com/google/common/collect/ImmutableList.class": "11a93a247509c8abf3eacd553c401b35817d3e8e73cd1896ad0fe814be1d13ac",
+        "com/google/common/base/Preconditions.class": "a831146ec2996f3898544c5e7d78ff89a9e7c154f0c6847ea08470a4b6e5b3c2",
+        "com/google/protobuf/GeneratedMessageV3.class": "92963a8d68ca015628b844bb37fc54e9752cbd7fd6518443d1f6593e1e6c87fb",
+        "com/google/protobuf/ByteString.class": "986b60d42375b131f8779cb826c8c1d29083c8d392ce819bbb212998b33815cf",
+        "org/slf4j/LoggerFactory.class": "b9b5f7e95e72b11279707147b5e66c4659f8742b5797e2aaa8248145605b0364",
+        "org/apache/commons/lang3/StringUtils.class": "3af146816d1f7e5b45398d4b957555cf5de60d0d3b92d9f7eaeb365a09bfd454",
+        "org/bouncycastle/jce/provider/BouncyCastleProvider.class": "d93ce898528717ffa6c856d8f61c8e40a7e081b8b08bb0755fca25aee102255a",
+        "io/netty/handler/ssl/SslContext.class": "43c2b3a92ddf88776e287af103c6ae822d3caf48390ecef6fde3e63662ffd56d",
+        "cn/hutool/core/util/StrUtil.class": "dbf665bfe28c1a270f4c282f75847f3bfdbf1bfc0d5970bf03d70ffdeb560814",
+        "com/alibaba/fastjson/JSON.class": "a7e9a1566fe7d688b93f04a4947fe710d335060231adc226b7bfd615d359b1b9"
+      },
+      "classFamilies": {
+        "com/google/common/": {
+          "classes": 2356,
+          "sha256": "406e870e20002ad7c8c520263fda1904cee4e0154ab83dd3a0ff4b97cdcdfd3c"
+        },
+        "com/google/protobuf/": {
+          "classes": 699,
+          "sha256": "44d375b250f7e895ab6c34a15e9ae8dd43f0aed38247143ed32d66041ed46fc6"
+        },
+        "org/apache/commons/lang3/": {
+          "classes": 273,
+          "sha256": "c6b3156a72f975208ebb03c27ec03a57735ad27d777f22a4dc24c02098d40f3f"
+        },
+        "org/slf4j/": {
+          "classes": 34,
+          "sha256": "3359fbf51fd1f03c115f9bd0b7899d20518f356007947b6bea4b0be50291e37e"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,310 @@
+import Utils;
+import SizeOf;
+import TypesToBytes;
+import BytesToTypes;
+import TLVUtils;
+
+contract AMLib {
+    // TLV 标签常量
+    const uint16 TLV_PROOF_REQUEST = 4u16;
+    const uint16 TLV_PROOF_RESPONSE_BODY = 5u16;
+    const uint16 TLV_PROOF_RESPONSE_SIGNATURE = 6u16;
+    const uint16 TLV_PROOF_ERROR_CODE = 7u16;
+    const uint16 TLV_PROOF_ERROR_MSG = 8u16;
+    const uint16 TLV_PROOF_SENDER_DOMAIN = 9u16;
+    const uint16 TLV_PROOF_VERSION = 10u16;
+    struct AuthMessage {
+        uint32 version;
+        array<uint8> author;
+        uint32 protocolType;
+        array<uint8> body;
+    }
+
+    struct MessageFromRelayer {
+        array<uint8> hints;
+        array<uint8> proofData;
+    }
+
+    struct MessageForAM {
+        array<uint8> senderDomain;
+        array<uint8> rawMessage;
+    }
+
+    struct Request {
+        array<uint8> reqID;
+        array<uint8> rawReqBody;
+    }
+
+    struct Proof {
+        Request req;
+        array<uint8> rawRespBody;
+        uint32 errorCode;
+        array<uint8> errorMsg;
+        array<uint8> senderDomain;
+        uint16 version;
+    }
+
+    struct DecodeResult {
+        array<uint8> senderDomain;
+        array<uint8> rawResp;
+        array<uint8> rawTpProof;
+    }
+
+    /**
+     * @notice 从 UCP 包解码出 senderDomain 和 rawResp (AuthMessage bytes)
+     * @param rawMessage UCP 包
+     * @return DecodeResult 包含 senderDomain 和 rawResp
+     */
+    function DecodeResult decodeMessageFromRelayer(array<uint8> rawMessage) public const {
+        uint32 offset = 0u32;
+        __debug.print("[decodeMessageFromRelayer] rawMessage length: ", rawMessage.length());
+
+        // 读取 hints length (4 bytes, BIG-ENDIAN 从第0-4字节)
+        // 注意：UCP 包头使用 big-endian!
+        uint32 hintsLen = 0u32;
+        for (uint32 i = 0u32; i < 4u32; i++) {
+            hintsLen = (hintsLen << 8u32) | uint32(rawMessage[offset + i]);
+        }
+        __debug.print("[decodeMessageFromRelayer] hintsLen: ", hintsLen);
+        offset += 4u32;
+
+        // 跳过 hints
+        offset += hintsLen;
+
+        // 读取 proof length (4 bytes, BIG-ENDIAN)
+        uint32 proofLen = 0u32;
+        for (uint32 i = 0u32; i < 4u32; i++) {
+            proofLen = (proofLen << 8u32) | uint32(rawMessage[offset + i]);
+        }
+        __debug.print("[decodeMessageFromRelayer] proofLen: ", proofLen);
+        offset += 4u32;
+
+        // 读取 proof (从当前 offset 位置开始)
+        array<uint8> proof;
+        for (uint32 i = 0u32; i < proofLen; i++) {
+            proof.push(rawMessage[offset + i]);
+        }
+
+        // 解码 proof
+        return _decodeProof(proof);
+    }
+
+    /**
+     * @notice 从 Proof 的 TLV 结构中解析 senderDomain 和 rawRespBody
+     * @param rawProof Proof 数据
+     * @return DecodeResult 包含 senderDomain 和经过 UDAG Response 解码的 rawResp
+     */
+    function DecodeResult _decodeProof(array<uint8> rawProof) public const {
+        Proof proof;
+        uint32 offset = 6u32; // 跳过 TLV Header (6 bytes)
+
+        // 解析 TLV 项
+        while (offset < rawProof.length()) {
+            TLVUtils.TLVWithOffset result = TLVUtils.parseTLVItem(rawProof, offset);
+
+            if (result.tlvItem.tagType == TLV_PROOF_SENDER_DOMAIN) {
+                proof.senderDomain = Utils.bytesCopy(result.tlvItem.value);
+            } else {
+                if (result.tlvItem.tagType == TLV_PROOF_RESPONSE_BODY) {
+                proof.rawRespBody = Utils.bytesCopy(result.tlvItem.value);
+                } else {
+                    if (result.tlvItem.tagType == TLV_PROOF_ERROR_CODE) {
+                proof.errorCode = BytesToTypes.bytesToUint32(0u32, result.tlvItem.value);
+                    } else {
+                        if (result.tlvItem.tagType == TLV_PROOF_ERROR_MSG) {
+                proof.errorMsg = Utils.bytesCopy(result.tlvItem.value);
+                        } else {
+                            if (result.tlvItem.tagType == TLV_PROOF_VERSION) {
+                proof.version = BytesToTypes.bytesToUint16(0u32, result.tlvItem.value);
+                            }
+                        }
+                    }
+                }
+            }
+            // TLV_PROOF_REQUEST 暂时忽略
+
+            offset = result.offset;
+        }
+
+        // 从 UDAG Response 中提取 AuthMessage
+        DecodeResult dr;
+        dr.senderDomain = proof.senderDomain;
+        dr.rawResp = _decodeMsgBodyFromUDAGResp(proof.rawRespBody);
+        dr.rawTpProof = Utils.bytesCopy(rawProof);
+
+        return dr;
+    }
+
+    /**
+     * @notice 从 UDAG Response Body 中提取 AuthMessage
+     * @param rawData UDAG Response Body
+     * @return array<uint8> AuthMessage bytes
+     */
+    function array<uint8> _decodeMsgBodyFromUDAGResp(array<uint8> rawData) public const {
+        __debug.assert(rawData.length() > 12u32);
+
+        // UDAG Response 格式: [4 bytes status][4 bytes reserved][4 bytes body length (BIG ENDIAN)][body]
+        // 读取 body length (从第8字节开始的4字节，big-endian)
+        // bytesToUint32(offset) 读取 [offset-4, offset)，所以要读取第8-12字节，offset应该是12
+        uint32 bodyLen = BytesToTypes.bytesToUint32(12u32, rawData);
+        // 反转字节序 (从 big-endian 转 little-endian)
+        bodyLen = Utils.reverseUint32(bodyLen);
+
+        __debug.print("[_decodeMsgBodyFromUDAGResp] bodyLen: ", bodyLen);
+        __debug.assert(rawData.length() >= 12u32 + bodyLen);
+
+        // 提取 body (从第 12 字节开始，长度为 bodyLen)
+        array<uint8> body;
+        for (uint32 i = 0u32; i < bodyLen; i++) {
+            body.push(rawData[12u32 + i]);
+        }
+        __debug.print("[_decodeMsgBodyFromUDAGResp] Extracted body length: ", body.length());
+
+        return body;
+    }
+
+    function AuthMessage decodeAuthMessage(array<uint8> pkg) public const{
+        uint32 offset = pkg.length();
+        AuthMessage amMsg;
+        __debug.print("offset: ", offset);
+
+        // version
+        amMsg.version = BytesToTypes.bytesToUint32(offset, pkg);
+        offset -= 4u32;
+        __debug.print("amMsg.version: ", amMsg.version);
+        __debug.print("offset: ", offset);
+
+        __debug.assert(amMsg.version >= 1u32);
+        __debug.assert(amMsg.version <= 2u32);
+
+        // author
+        BytesToTypes.bytesToBytes32(offset, pkg, amMsg.author);
+        offset -= 32u32;
+        __debug.print("amMsg.author: ", amMsg.author);
+        __debug.print("offset: ", offset);
+
+        // protocolType
+        amMsg.protocolType = BytesToTypes.bytesToUint32(offset, pkg);
+        offset -= 4u32;
+        __debug.print("amMsg.protocolType: ", amMsg.protocolType);
+        __debug.print("offset: ", offset);
+
+        // body
+        if (amMsg.version == 1u32) {
+            BytesToTypes.bytesToSubBytes(offset, pkg, amMsg.body);
+        } else if (amMsg.version == 2u32) {
+            BytesToTypes.varBytesToSubBytes(offset, pkg, amMsg.body);
+        }
+        __debug.print("amMsg.body: ", amMsg.body);
+        __debug.print("offset: ", offset);
+
+        return amMsg;
+    }
+
+    // function array<uint8> encodeProofMessage(Proof item) public const{
+    //     return item.serialize();
+    // }
+
+    // function Proof decodeProofMessage(array<uint8> rawMsg) public const{
+    //     Proof item;
+    //     item.deserialize(rawMsg);
+    //     return item;
+    // }
+
+    // function array<uint8> encodMessageFromRelayer(MessageFromRelayer item) public const{
+    //     return item.serialize();
+    // }
+
+    // function decodeMessageFromRelayer(array<uint8> rawMsg, MessageFromRelayer r) public const{
+    //     __debug.print(rawMsg);
+    //     r.deserialize(rawMsg);
+    //     __debug.print(r);
+    // }
+
+    function array<uint8> encodeAuthMessage(AuthMessage amMsg) public const {
+        __debug.print("amMsg: ", amMsg);
+        __debug.assert(amMsg.version >= 1u32);
+        __debug.assert(amMsg.version <= 2u32);
+        array<uint8> pkg;
+        if (amMsg.version == 1u32) {
+            pkg = encodeAuthMessageV1(amMsg);
+        } else if (amMsg.version == 2u32) {
+            pkg = encodeAuthMessageV2(amMsg);
+        }
+        return pkg;
+    }
+
+    function array<uint8> encodeAuthMessageV1(AuthMessage amMsg) public const {
+        uint32 bodyLen = SizeOf.sizeOfBytes(amMsg.body);
+        uint32 len = bodyLen + 4u32 + 32u32 + 4u32;
+
+        array<uint8> pkg;
+        pkg.set_length(len);
+        uint32 offset = len;
+
+        // version
+        TypesToBytes.uint32ToBytes(offset, amMsg.version, pkg);
+        offset -= 4u32;
+
+        // author
+        TypesToBytes.bytes32ToBytes(offset, amMsg.author, pkg);
+        offset -= 32u32;
+
+        // protocolType
+        TypesToBytes.uint32ToBytes(offset, amMsg.protocolType, pkg);
+        offset -= 4u32;
+
+        // body
+        TypesToBytes.bytesToNewBytes(offset, amMsg.body, pkg);
+        offset -= bodyLen;
+
+        return pkg;
+    }
+
+    function array<uint8> encodeAuthMessageV2(AuthMessage amMsg) public const {
+        uint32 bodyLen = amMsg.body.length();
+        __debug.assert(bodyLen <= 0xffffffffu32);
+        uint32 len = bodyLen + 4u32 + 4u32 + 32u32 + 4u32;
+
+        array<uint8> pkg;
+        pkg.set_length(len);
+        uint32 offset = len;
+
+        // version
+        TypesToBytes.uint32ToBytes(offset, amMsg.version, pkg);
+        offset -= 4u32;
+
+        // author
+        TypesToBytes.bytes32ToBytes(offset, amMsg.author, pkg);
+        offset -= 32u32;
+
+        // protocolType
+        TypesToBytes.uint32ToBytes(offset, amMsg.protocolType, pkg);
+        offset -= 4u32;
+
+        // body
+        TypesToBytes.varBytesToNewBytes(offset, amMsg.body, pkg);
+
+        return pkg;
+    }
+
+    // function AuthMessage decodeAuthMessage(array<uint8> rawMsg) public const{
+    //     AuthMessage amMsg;
+    //     amMsg.deserialize(rawMsg);
+    //     return amMsg;
+    // }
+
+
+    // function MessageForAM decode(array<uint8> rawMessage) public const{
+    //     __debug.print(rawMessage);
+    //     // rawMsg --> [struct] MessageFromRelayer
+    //     MessageFromRelayer messageFromRelayer = decodeMessageFromRelayer(rawMessage);
+    //     // MessageFromRelayer.proofData --> [struct] proof --> [bytes] undecoded AM Message
+    //     Proof proof = decodeProofMessage(messageFromRelayer.proofData);
+    //     MessageForAM messageForAM = decodeMessageForAM(proof.rawRespBody);
+    //     messageForAM.senderDomain = proof.senderDomain;
+
+    //     return messageForAM;
+    // }
+
+}

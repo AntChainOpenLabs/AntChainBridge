@@ -18,6 +18,8 @@ public interface ISDPMsgClientContract {
      */
     void setAmContract(String amContract);
 
+    void setMonitorContract(String monitorContract);
+
     /**
      * Query the sequence number of the cross-chain direction
      *

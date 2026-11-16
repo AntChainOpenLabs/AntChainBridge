@@ -17,6 +17,8 @@
 package com.alipay.antchain.bridge.plugins.mychain;
 
 import java.util.stream.Collectors;
+import java.util.Collections;
+import java.util.Set;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.HexUtil;
@@ -106,16 +108,15 @@ public class MychainHcdvsService extends AbstractHCDVSService {
             }
 
             ConsensusNodeInfo currConsensusNodeInfo = ConsensusNodeInfo.decode(stateToVerify.getConsensusNodeInfo());
-            if (!CollectionUtil.isEqualList(
-                    currConsensusNodeInfo.getAmContractIds().stream().sorted().collect(Collectors.toList()),
-                    parentConsensusNodeInfo.getAmContractIds().stream().sorted().collect(Collectors.toList())
-            )) {
-                getHCDVSLogger().error("am contract ids {} not equal with {} from parent consensus state",
-                        StrUtil.join(",", currConsensusNodeInfo.getAmContractIds()),
-                        StrUtil.join(",", parentConsensusNodeInfo.getAmContractIds())
-                );
+            Set<String> currentIds = normalizeAmContractIds(currConsensusNodeInfo.getAmContractIds());
+            Set<String> parentIds = normalizeAmContractIds(parentConsensusNodeInfo.getAmContractIds());
+            if (currentIds.isEmpty() || parentIds.isEmpty()) {
+                return VerifyResult.fail("am contract ids are empty");
+            }
+            if (!currentIds.equals(parentIds)) {
                 return VerifyResult.fail("am contract ids not equal with parent consensus state");
             }
+            currConsensusNodeInfo.setAmContractIds(currentIds);
 
             currConsensusNodeInfo.setConsensusNodePublicKeys(parentConsensusNodeInfo.getConsensusNodePublicKeys());
             if (ObjectUtil.isNotEmpty(currConsensusNodeInfo.getTransactionReceipts())) {
@@ -158,6 +159,13 @@ public class MychainHcdvsService extends AbstractHCDVSService {
         }
 
         return VerifyResult.success();
+    }
+
+    private Set<String> normalizeAmContractIds(Set<String> ids) {
+        if (ids == null) {
+            return Collections.emptySet();
+        }
+        return ids.stream().filter(StrUtil::isNotBlank).collect(Collectors.toSet());
     }
 
     @Override

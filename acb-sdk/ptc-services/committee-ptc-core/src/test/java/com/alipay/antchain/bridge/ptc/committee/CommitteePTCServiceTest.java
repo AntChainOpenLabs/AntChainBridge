@@ -17,12 +17,16 @@
 package com.alipay.antchain.bridge.ptc.committee;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.PrivateKey;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.ListUtil;
@@ -51,14 +55,17 @@ import com.alipay.antchain.bridge.ptc.committee.types.basic.EndorseBlockStateRes
 import com.alipay.antchain.bridge.ptc.committee.types.basic.NodePublicKeyEntry;
 import com.alipay.antchain.bridge.ptc.committee.types.network.CommitteeNetworkInfo;
 import com.alipay.antchain.bridge.ptc.committee.types.network.nodeclient.Node;
+import com.alipay.antchain.bridge.ptc.committee.types.network.nodeclient.NodeVerifyCrossChainMessageResult;
 import com.alipay.antchain.bridge.ptc.committee.types.tpbta.CommitteeEndorseRoot;
 import com.alipay.antchain.bridge.ptc.committee.types.tpbta.NodeEndorseInfo;
 import com.alipay.antchain.bridge.ptc.committee.types.tpbta.OptionalEndorsePolicy;
 import com.alipay.antchain.bridge.ptc.committee.types.tpbta.VerifyBtaExtension;
 import com.alipay.antchain.bridge.ptc.committee.types.trustroot.CommitteeVerifyAnchor;
+import com.alipay.antchain.bridge.ptc.types.PTCVerifyCrossChainMessageResult;
 import com.google.protobuf.ByteString;
 import lombok.SneakyThrows;
 import org.junit.*;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 import static org.junit.Assert.*;
@@ -554,9 +561,62 @@ public class CommitteePTCServiceTest {
     }
 
     @Test
+    @SneakyThrows
+    public void testCollectValidatedConsensusStateSkipsFailedOptionalFuture() {
+        CommitteePTCService ptcService = new CommitteePTCService();
+        CompletableFuture<ValidatedConsensusState> failedOptional = new CompletableFuture<>();
+        failedOptional.completeExceptionally(new RuntimeException("optional node is behind"));
+
+        Method collector = CommitteePTCService.class.getDeclaredMethod(
+                "collectValidatedConsensusStateResults",
+                java.util.List.class
+        );
+        collector.setAccessible(true);
+        ValidatedConsensusState result = (ValidatedConsensusState) collector.invoke(
+                ptcService,
+                Arrays.<Future<ValidatedConsensusState>>asList(
+                        CompletableFuture.completedFuture(currVcs),
+                        failedOptional
+                )
+        );
+
+        assertArrayEquals(currVcs.getEncodedToSign(), result.getEncodedToSign());
+        assertEquals(1, CommitteeEndorseProof.decode(result.getPtcProof()).getSigs().size());
+    }
+
+    @Test
+    @SneakyThrows
+    @SuppressWarnings("unchecked")
+    public void testCollectNodeVerifyResultsSkipsFailedOptionalFuture() {
+        CommitteePTCService ptcService = new CommitteePTCService();
+        NodeVerifyCrossChainMessageResult requiredResult =
+                new NodeVerifyCrossChainMessageResult(null, "approved", "");
+        CompletableFuture<NodeVerifyCrossChainMessageResult> failedOptional = new CompletableFuture<>();
+        failedOptional.completeExceptionally(new RuntimeException("optional node has not indexed this state"));
+
+        Method collector = CommitteePTCService.class.getDeclaredMethod(
+                "collectNodeVerifyResults",
+                java.util.List.class
+        );
+        collector.setAccessible(true);
+        java.util.List<NodeVerifyCrossChainMessageResult> results =
+                (java.util.List<NodeVerifyCrossChainMessageResult>) collector.invoke(
+                        ptcService,
+                        Arrays.<Future<NodeVerifyCrossChainMessageResult>>asList(
+                                CompletableFuture.completedFuture(requiredResult),
+                                failedOptional
+                        )
+                );
+
+        assertEquals(1, results.size());
+        assertSame(requiredResult, results.get(0));
+    }
+
+    @Test
     public void testVerifyCrossChainMessage() {
         CommitteePTCService ptcService = new CommitteePTCService();
         ptcService.startup(SERVICE_CONF.getBytes());
+        String ucpId = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
         CommitteeNodeProof nodeProof = CommitteeNodeProof.builder()
                 .nodeId("node1")
@@ -575,15 +635,77 @@ public class CommitteePTCServiceTest {
                         .setVerifyCrossChainMessageResp(
                                 VerifyCrossChainMessageResponse.newBuilder()
                                         .setRawNodeProof(ByteString.copyFrom(nodeProof.encode()))
+                                        .setRegulationStatus("approved")
                         ).build()
         );
 
-        ThirdPartyProof tpProof = ptcService.verifyCrossChainMessage(tpbta, currVcs, ucp);
+        clearInvocations(mockStubNode1);
+        PTCVerifyCrossChainMessageResult verifyResult =
+                ptcService.verifyCrossChainMessageWithResult(tpbta, currVcs, ucp, ucpId);
+        ThirdPartyProof tpProof = verifyResult.getThirdPartyProof();
+
+        ArgumentCaptor<VerifyCrossChainMessageRequest> requestCaptor =
+                ArgumentCaptor.forClass(VerifyCrossChainMessageRequest.class);
+        verify(mockStubNode1).verifyCrossChainMessage(requestCaptor.capture());
+        assertEquals(ucpId, requestCaptor.getValue().getUcpId());
+        assertArrayEquals(ucp.encode(), requestCaptor.getValue().getRawUcp().toByteArray());
 
         assertEquals(tpbta.getCrossChainLane().getLaneKey(), tpProof.getTpbtaCrossChainLane().getLaneKey());
+        assertEquals("approved", verifyResult.getRegulationStatus());
+        assertEquals("", verifyResult.getRegulationReason());
         CommitteeEndorseProof endorseProof = CommitteeEndorseProof.decode(tpProof.getRawProof());
         assertEquals(COMMITTEE_ID, endorseProof.getCommitteeId());
         assertEquals(1, endorseProof.getSigs().size());
+
+        clearInvocations(mockStubNode1);
+        ptcService.verifyCrossChainMessageWithResult(tpbta, currVcs, ucp);
+        verify(mockStubNode1).verifyCrossChainMessage(requestCaptor.capture());
+        assertEquals("", requestCaptor.getValue().getUcpId());
+    }
+
+    @Test
+    public void testDioxideDomainUsesFullCommitteeProof() {
+        CommitteePTCService ptcService = new CommitteePTCService();
+        ptcService.startup(SERVICE_CONF.getBytes());
+        ThirdPartyBlockchainTrustAnchorV1 dioxideTpBta = BeanUtil.copyProperties(
+                tpbta,
+                ThirdPartyBlockchainTrustAnchorV1.class
+        );
+        CrossChainLane dioxideLane = new CrossChainLane(new CrossChainDomain("dioxide2"));
+        dioxideTpBta.setCrossChainLane(dioxideLane);
+
+        CommitteeNodeProof nodeProof = CommitteeNodeProof.builder()
+                .nodeId("node1")
+                .signAlgo(SignAlgoEnum.KECCAK256_WITH_SECP256K1)
+                .signature(SignAlgoEnum.KECCAK256_WITH_SECP256K1.getSigner().sign(
+                        NODE_PTC_PRIVATE_KEY,
+                        ThirdPartyProof.create(
+                                dioxideTpBta.getTpbtaVersion(),
+                                ucp.getSrcMessage().getMessage(),
+                                dioxideLane
+                        ).getEncodedToSign()
+                )).build();
+        when(mockStubNode1.verifyCrossChainMessage(any())).thenReturn(
+                Response.newBuilder()
+                        .setVerifyCrossChainMessageResp(
+                                VerifyCrossChainMessageResponse.newBuilder()
+                                        .setRawNodeProof(ByteString.copyFrom(nodeProof.encode()))
+                                        .setRegulationStatus("approved")
+                        ).build()
+        );
+
+        PTCVerifyCrossChainMessageResult result = ptcService.verifyCrossChainMessageWithResult(
+                dioxideTpBta,
+                currVcs,
+                ucp,
+                "dioxide-ucp"
+        );
+
+        assertNotNull(result.getThirdPartyProof());
+        assertTrue(result.getThirdPartyProof().getRawProof().length > 0);
+        CommitteeEndorseProof proof = CommitteeEndorseProof.decode(result.getThirdPartyProof().getRawProof());
+        assertEquals(1, proof.getSigs().size());
+        assertEquals("node1", proof.getSigs().get(0).getNodeId());
     }
 
     @Test

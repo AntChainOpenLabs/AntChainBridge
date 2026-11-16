@@ -1,0 +1,23 @@
+[Unit]
+Description=AntChain Bridge Simple Monitor System
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=@@RUN_USER@@
+Group=@@RUN_GROUP@@
+WorkingDirectory="@@WORKING_DIR@@"
+ExecStart="@@JAVA_BIN@@" -Xms128m -Xmx512m -jar "@@JAR_FILE@@"
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+SuccessExitStatus=143
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

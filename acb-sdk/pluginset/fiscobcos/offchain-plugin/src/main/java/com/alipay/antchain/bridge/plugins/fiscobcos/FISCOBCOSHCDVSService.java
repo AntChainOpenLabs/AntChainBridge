@@ -11,15 +11,19 @@ import com.alipay.antchain.bridge.commons.core.bta.IBlockchainTrustAnchor;
 import com.alipay.antchain.bridge.plugins.lib.HeteroChainDataVerifierService;
 import com.alipay.antchain.bridge.plugins.spi.ptc.AbstractHCDVSService;
 import com.alipay.antchain.bridge.plugins.spi.ptc.core.VerifyResult;
-import org.fisco.bcos.sdk.v3.crypto.CryptoSuite;
-import org.fisco.bcos.sdk.v3.crypto.hash.Keccak256;
-import org.fisco.bcos.sdk.v3.model.CryptoType;
 import org.fisco.bcos.sdk.v3.utils.MerkleProofUtility;
+import org.bouncycastle.asn1.x9.X9ECParameters;
+import org.bouncycastle.crypto.ec.CustomNamedCurves;
+import org.bouncycastle.crypto.params.ECDomainParameters;
+import org.bouncycastle.crypto.params.ECPublicKeyParameters;
+import org.bouncycastle.crypto.signers.ECDSASigner;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * FISCO BCOS 异构链数据验证服务
@@ -31,7 +35,13 @@ import java.util.List;
 public class FISCOBCOSHCDVSService extends AbstractHCDVSService {
 
     private static final String SEND_AUTH_MESSAGE_TOPIC = "0x79b7516b1b7a6a39fb4b7b22e8667cd3744e5c27425292f8a9f49d1042c0c651";
-    private final CryptoSuite cryptoSuite = new CryptoSuite(CryptoType.ECDSA_TYPE);
+    private static final X9ECParameters SECP256K1_PARAMS = CustomNamedCurves.getByName("secp256k1");
+    private static final ECDomainParameters SECP256K1_DOMAIN = new ECDomainParameters(
+            SECP256K1_PARAMS.getCurve(),
+            SECP256K1_PARAMS.getG(),
+            SECP256K1_PARAMS.getN(),
+            SECP256K1_PARAMS.getH()
+    );
 
     /**
      * 查找并解析交易收据中的SendAuthMessage事件
@@ -194,6 +204,7 @@ public class FISCOBCOSHCDVSService extends AbstractHCDVSService {
 
         byte[] hashBytes = HexUtil.decodeHex(StrUtil.removePrefix(hashHex, "0x"));
         int validSignatureCount = 0;
+        Set<Integer> verifiedSealerIndexes = new HashSet<>();
 
         for (int i = 0; i < signatureListArray.size(); i++) {
             JSONObject signatureInfo = signatureListArray.getJSONObject(i);
@@ -211,13 +222,18 @@ public class FISCOBCOSHCDVSService extends AbstractHCDVSService {
                 continue;
             }
 
+            if (!verifiedSealerIndexes.add(sealerIndex)) {
+                getHCDVSLogger().warn("忽略共识节点 {} 的重复签名", sealerIndex);
+                continue;
+            }
+
             String nodeId = sealerListArray.getString(sealerIndex);
             String publicKeyHex = StrUtil.removePrefix(nodeId, "0x");
 
             try {
                 byte[] signatureBytes = HexUtil.decodeHex(
                         StrUtil.removePrefix(signatureInfo.getString("signature"), "0x"));
-                if (cryptoSuite.verify(publicKeyHex, hashBytes, signatureBytes)) {
+                if (verifySecp256k1Signature(publicKeyHex, hashBytes, signatureBytes)) {
                     validSignatureCount++;
                     getHCDVSLogger().debug("节点 {} 的签名验证成功", nodeId);
                 } else {
@@ -229,6 +245,47 @@ public class FISCOBCOSHCDVSService extends AbstractHCDVSService {
         }
 
         return validSignatureCount;
+    }
+
+    /**
+     * Verifies the FISCO BCOS ECDSA signature without constructing {@code CryptoSuite}.
+     *
+     * <p>The SDK's {@code CryptoSuite} eagerly loads the WeDPR native library even though
+     * HCDVS only needs standard secp256k1 verification. Committee nodes load HCDVS in an
+     * isolated PF4J class loader, where that native resource is deliberately unavailable.
+     * Bouncy Castle keeps this verification deterministic, portable and independent of
+     * the blockchain SDK runtime.</p>
+     */
+    private boolean verifySecp256k1Signature(String publicKeyHex, byte[] hashBytes, byte[] signatureBytes) {
+        if (hashBytes.length != 32 || (signatureBytes.length != 64 && signatureBytes.length != 65)) {
+            return false;
+        }
+
+        byte[] publicKeyBytes = HexUtil.decodeHex(StrUtil.removePrefix(publicKeyHex, "0x"));
+        if (publicKeyBytes.length == 64) {
+            byte[] uncompressedPublicKey = new byte[65];
+            uncompressedPublicKey[0] = 0x04;
+            System.arraycopy(publicKeyBytes, 0, uncompressedPublicKey, 1, publicKeyBytes.length);
+            publicKeyBytes = uncompressedPublicKey;
+        }
+
+        if (publicKeyBytes.length != 33 && publicKeyBytes.length != 65) {
+            return false;
+        }
+
+        BigInteger r = new BigInteger(1, Arrays.copyOfRange(signatureBytes, 0, 32));
+        BigInteger s = new BigInteger(1, Arrays.copyOfRange(signatureBytes, 32, 64));
+        if (r.signum() <= 0 || s.signum() <= 0 || r.compareTo(SECP256K1_DOMAIN.getN()) >= 0
+                || s.compareTo(SECP256K1_DOMAIN.getN()) >= 0) {
+            return false;
+        }
+
+        ECDSASigner verifier = new ECDSASigner();
+        verifier.init(false, new ECPublicKeyParameters(
+                SECP256K1_PARAMS.getCurve().decodePoint(publicKeyBytes),
+                SECP256K1_DOMAIN
+        ));
+        return verifier.verifySignature(hashBytes, r, s);
     }
 
     /**
@@ -402,7 +459,7 @@ public class FISCOBCOSHCDVSService extends AbstractHCDVSService {
                         receiptsRoot,
                         proofNodes,
                         receiptHash,
-                        new Keccak256()
+                        new PureJavaKeccak256()
                 );
 
                 if (!proofValid) {

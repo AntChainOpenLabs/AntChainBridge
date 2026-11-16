@@ -93,6 +93,26 @@
     </appender>
     <!--非 error 级别的日志-->
 
+    <appender name="experimentMetricsAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logging.path}/${APP_NAME}/experiment-metrics.log</file>
+        <encoder>
+            <pattern>%msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <FileNamePattern>${logging.path}/${APP_NAME}/experiment-metrics.log.%d{yyyy-MM-dd}.%i</FileNamePattern>
+            <maxHistory>14</maxHistory>
+            <maxFileSize>100MB</maxFileSize>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+    <appender name="asyncExperimentMetrics" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>8192</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="experimentMetricsAppender"/>
+    </appender>
+
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
             <!--官方logback.xml配置-->
@@ -108,6 +128,10 @@
 
     <logger name="com.alipay.antchain.bridge.bcdns.embedded.server" level="INFO" additivity="false">
         <appender-ref ref="embeddedBcdnsAppender"/>
+    </logger>
+
+    <logger name="EXPERIMENT_METRIC" level="INFO" additivity="false">
+        <appender-ref ref="asyncExperimentMetrics"/>
     </logger>
 
     <root level="INFO">

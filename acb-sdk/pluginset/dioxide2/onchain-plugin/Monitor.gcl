@@ -1,0 +1,205 @@
+import IContractUsingSDP;
+import IContractUsingMonitor;
+import ISDPMessage;
+import IMonitor;
+import IMonitorVerifier;
+import MonitorLib;
+import Utils;
+
+contract Monitor implements IMonitor.MonitorInterface, IContractUsingMonitor.ContractUsingMonitorInterface {
+
+    @global address owner;
+    @global uint64 sdpContractId;
+    @global address sdpAddress;
+    @global uint64 monitorVerifierId;
+    @global address monitorVerifierAddress;
+    @global uint32 monitorControl;
+
+    const uint32 MONITOR_CLOSE = 1u32;
+    const uint32 MONITOR_OPEN = 2u32;
+    const uint32 MONITOR_ROLLBACK = 3u32;
+
+    @global function on_deploy(address _owner) {
+        owner = _owner;
+        __debug.print("[on_deploy] Monitor deployed - address:", __address(), " id:", __id());
+
+        // sdpContractId = SDPMsg.__id();
+        // sdpAddress = SDPMsg.__address();
+        // __debug.print("[on_deploy] SDP Protocol auto-configured - contractId:", sdpContractId, " address:", sdpAddress);
+
+        // uint64 selfId = __id();
+        // address selfAddress = __address();
+        // SDPMsg.setMonitorContractByMonitor(selfId, selfAddress);
+        // __debug.print("[on_deploy] set monitor to sdp - contractId:", selfId, " address:", selfAddress);
+    }
+
+    @address function setProtocol(uint64 _sdpContractId, address _sdpAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_sdpContractId, ^_sdpAddress) {
+            sdpContractId = _sdpContractId;
+            sdpAddress = _sdpAddress;
+            __debug.print("[setProtocol] sdp Contract reconfigured - contractId: ", sdpContractId, " address: ", sdpAddress);
+        }
+    }
+
+    @address function setMonitorControl(uint32 _monitorControl) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        __debug.assert(_monitorControl == MONITOR_CLOSE
+                || _monitorControl == MONITOR_OPEN
+                || _monitorControl == MONITOR_ROLLBACK);
+        relay@global (^_monitorControl) {
+            monitorControl = _monitorControl;
+        }
+    }
+
+    @address function setMonitorVerifier(uint64 _monitorVerifierId, address _monitorVerifierAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_monitorVerifierId, ^_monitorVerifierAddress) {
+            monitorVerifierId = _monitorVerifierId;
+            monitorVerifierAddress = _monitorVerifierAddress;
+        }
+    }
+
+    @address function sendMonitorMessage(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public export {
+
+        MonitorLib.MonitorMessage monitorMessage;
+        monitorMessage.monitorType = monitorControl;
+        monitorMessage.message = Utils.bytesCopy(message);
+
+        array<uint8> rawMsg = MonitorLib.encodeMonitorMsg(monitorMessage);
+        __debug.print("[sendMonitorMessage] rawMsg: ", rawMsg);
+
+        ISDPMessage.SDPMessageInterface sdp = ISDPMessage.SDPMessageInterface(sdpContractId);
+        sdp.sendMessage(receiverDomain, receiverID, rawMsg, senderID);
+    }
+
+    @address function sendUnorderedMonitorMessage(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public export {
+
+        MonitorLib.MonitorMessage monitorMessage;
+        monitorMessage.monitorType = monitorControl;
+        monitorMessage.message = Utils.bytesCopy(message);
+
+        array<uint8> rawMsg = MonitorLib.encodeMonitorMsg(monitorMessage);
+        __debug.print("[sendMonitorMessage] rawMsg: ", rawMsg);
+
+        ISDPMessage.SDPMessageInterface sdp = ISDPMessage.SDPMessageInterface(sdpContractId);
+        sdp.sendUnorderedMessage(receiverDomain, receiverID, rawMsg, senderID);
+    }
+
+    @global function recvMessageFromSDP(array<uint8> senderDomain, array<uint8> author, uint64 receiverID, array<uint8> message) public {
+
+        __debug.assert(__transaction.get_sender() == sdpAddress);
+        MonitorLib.MonitorMessage monitorMessage = MonitorLib.decodeMonitorMsg(message);
+        __debug.print("[recvMessageFromSDP] monitorMessage.monitorType: ", monitorMessage.monitorType);
+        __debug.print("[recvMessageFromSDP] monitorMessage.monitorMsg: ", monitorMessage.monitorMsg);
+        __debug.print("[recvMessageFromSDP] monitorMessage.message: ", monitorMessage.message);
+
+        if (monitorMessage.monitorType == MONITOR_OPEN) {
+            __debug.assert(monitorVerifierId != 0u64);
+            IMonitorVerifier.MonitorVerifierInterface verifier =
+                    IMonitorVerifier.MonitorVerifierInterface(monitorVerifierId);
+            bool approved = verifier.verifyMonitorNodeProofMessage();
+            if (approved) {
+                IContractUsingSDP.ContractUsingSDPInterface dapp =
+                        IContractUsingSDP.ContractUsingSDPInterface(receiverID);
+                dapp.recvMessage(senderDomain, author, monitorMessage.message);
+            } else {
+                monitorMessage.monitorType = MONITOR_ROLLBACK;
+                monitorMessage.monitorMsg.set_length(0u32);
+                monitorMessage.monitorMsg.push(77u8);
+                monitorMessage.monitorMsg.push(105u8);
+                monitorMessage.monitorMsg.push(100u8);
+                monitorMessage.monitorMsg.push(77u8);
+                monitorMessage.monitorMsg.push(111u8);
+                monitorMessage.monitorMsg.push(110u8);
+                monitorMessage.monitorMsg.push(105u8);
+                monitorMessage.monitorMsg.push(116u8);
+                monitorMessage.monitorMsg.push(111u8);
+                monitorMessage.monitorMsg.push(114u8);
+                monitorMessage.monitorMsg.push(105u8);
+                monitorMessage.monitorMsg.push(110u8);
+                monitorMessage.monitorMsg.push(103u8);
+                monitorMessage.monitorMsg.push(32u8);
+                monitorMessage.monitorMsg.push(110u8);
+                monitorMessage.monitorMsg.push(111u8);
+                monitorMessage.monitorMsg.push(116u8);
+                monitorMessage.monitorMsg.push(32u8);
+                monitorMessage.monitorMsg.push(112u8);
+                monitorMessage.monitorMsg.push(97u8);
+                monitorMessage.monitorMsg.push(115u8);
+                monitorMessage.monitorMsg.push(115u8);
+                array<uint8> rawRollback = MonitorLib.encodeMonitorMsg(monitorMessage);
+                ISDPMessage.SDPMessageInterface sdp = ISDPMessage.SDPMessageInterface(sdpContractId);
+                sdp.sendMessageFromMonitor(senderDomain, author, rawRollback, receiverID);
+            }
+        } else if (monitorMessage.monitorType == MONITOR_CLOSE || monitorMessage.monitorType == MONITOR_ROLLBACK) {
+            IContractUsingSDP.ContractUsingSDPInterface dapp =
+                    IContractUsingSDP.ContractUsingSDPInterface(receiverID);
+            dapp.recvMessage(senderDomain, author, monitorMessage.message);
+        } else {
+            __debug.assert(false);
+        }
+    }
+
+    @global function recvUnorderedMessageFromSDP(array<uint8> senderDomain, array<uint8> author, uint64 receiverID, array<uint8> message) public {
+
+        __debug.assert(__transaction.get_sender() == sdpAddress);
+        MonitorLib.MonitorMessage monitorMessage = MonitorLib.decodeMonitorMsg(message);
+        __debug.print("[recvMessageFromSDP] monitorMessage.monitorType: ", monitorMessage.monitorType);
+        __debug.print("[recvMessageFromSDP] monitorMessage.monitorMsg: ", monitorMessage.monitorMsg);
+        __debug.print("[recvMessageFromSDP] monitorMessage.message: ", monitorMessage.message);
+
+        if (monitorMessage.monitorType == MONITOR_OPEN) {
+            __debug.assert(monitorVerifierId != 0u64);
+            IMonitorVerifier.MonitorVerifierInterface verifier =
+                    IMonitorVerifier.MonitorVerifierInterface(monitorVerifierId);
+            bool approved = verifier.verifyMonitorNodeProofMessage();
+            if (approved) {
+                IContractUsingSDP.ContractUsingSDPInterface dapp =
+                        IContractUsingSDP.ContractUsingSDPInterface(receiverID);
+                dapp.recvUnorderedMessage(senderDomain, author, monitorMessage.message);
+            } else {
+                monitorMessage.monitorType = MONITOR_ROLLBACK;
+                monitorMessage.monitorMsg.set_length(0u32);
+                monitorMessage.monitorMsg.push(77u8);
+                monitorMessage.monitorMsg.push(105u8);
+                monitorMessage.monitorMsg.push(100u8);
+                monitorMessage.monitorMsg.push(77u8);
+                monitorMessage.monitorMsg.push(111u8);
+                monitorMessage.monitorMsg.push(110u8);
+                monitorMessage.monitorMsg.push(105u8);
+                monitorMessage.monitorMsg.push(116u8);
+                monitorMessage.monitorMsg.push(111u8);
+                monitorMessage.monitorMsg.push(114u8);
+                monitorMessage.monitorMsg.push(105u8);
+                monitorMessage.monitorMsg.push(110u8);
+                monitorMessage.monitorMsg.push(103u8);
+                monitorMessage.monitorMsg.push(32u8);
+                monitorMessage.monitorMsg.push(110u8);
+                monitorMessage.monitorMsg.push(111u8);
+                monitorMessage.monitorMsg.push(116u8);
+                monitorMessage.monitorMsg.push(32u8);
+                monitorMessage.monitorMsg.push(112u8);
+                monitorMessage.monitorMsg.push(97u8);
+                monitorMessage.monitorMsg.push(115u8);
+                monitorMessage.monitorMsg.push(115u8);
+                array<uint8> rawRollback = MonitorLib.encodeMonitorMsg(monitorMessage);
+                ISDPMessage.SDPMessageInterface sdp = ISDPMessage.SDPMessageInterface(sdpContractId);
+                sdp.sendUnorderedMessageFromMonitor(senderDomain, author, rawRollback, receiverID);
+            }
+        } else if (monitorMessage.monitorType == MONITOR_CLOSE || monitorMessage.monitorType == MONITOR_ROLLBACK) {
+            IContractUsingSDP.ContractUsingSDPInterface dapp =
+                    IContractUsingSDP.ContractUsingSDPInterface(receiverID);
+            dapp.recvUnorderedMessage(senderDomain, author, monitorMessage.message);
+        } else {
+            __debug.assert(false);
+        }
+    }
+
+    @address function recvMessageForTest(array<uint8> message) public export {
+        MonitorLib.MonitorMessage monitorMessage = MonitorLib.decodeMonitorMsg(message);
+        __debug.print("[recvMessageFromSDP] monitorMessage.monitorType: ", monitorMessage.monitorType);
+        __debug.print("[recvMessageFromSDP] monitorMessage.monitorMsg: ", monitorMessage.monitorMsg);
+        __debug.print("[recvMessageFromSDP] monitorMessage.message: ", monitorMessage.message);
+    }
+}

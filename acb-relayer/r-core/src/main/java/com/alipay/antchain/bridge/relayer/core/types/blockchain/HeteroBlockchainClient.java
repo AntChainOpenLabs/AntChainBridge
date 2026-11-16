@@ -26,6 +26,8 @@ public class HeteroBlockchainClient extends AbstractBlockchainClient {
 
     private final ISDPMsgClientContract sdpMsgClient;
 
+    private final IMonitorClientContract monitorClient;
+
     private final IPtcContract ptcContract;
 
     public HeteroBlockchainClient(IBBCServiceClient bbcClient, BlockchainMeta blockchainMeta) {
@@ -33,6 +35,7 @@ public class HeteroBlockchainClient extends AbstractBlockchainClient {
         this.bbcClient = bbcClient;
         this.amClientContract = new AMClientContractHeteroBlockchainImpl(bbcClient);
         this.sdpMsgClient = new SDPMsgClientHeteroBlockchainImpl(bbcClient);
+        this.monitorClient = new MonitorClientContractHeteroBlockchainImpl(bbcClient);
         this.ptcContract = new PtcContractHeteroBlockchainImpl(bbcClient);
     }
 
@@ -180,6 +183,11 @@ public class HeteroBlockchainClient extends AbstractBlockchainClient {
     @Override
     public ISDPMsgClientContract getSDPMsgClientContract() {
         return this.sdpMsgClient;
+    }
+
+    @Override
+    public IMonitorClientContract getMonitorClientContract() {
+        return this.monitorClient;
     }
 
     @Override

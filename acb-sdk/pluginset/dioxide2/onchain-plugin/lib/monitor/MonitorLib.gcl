@@ -1,0 +1,63 @@
+import SizeOf;
+import TypesToBytes;
+import BytesToTypes;
+
+contract MonitorLib {
+    
+    struct MonitorMessage {
+        uint32 monitorType;
+        array<uint8> monitorMsg;
+        array<uint8> message;
+    }
+
+    function array<uint8> encodeMonitorMsg(MonitorMessage monitorMessage) public const {
+        uint32 monitorMsgLen = SizeOf.sizeOfBytes(monitorMessage.monitorMsg);
+        uint32 messageLen = SizeOf.sizeOfBytes(monitorMessage.message);
+        uint32 len = 4u32 + monitorMsgLen + messageLen;
+
+        array<uint8> pkg;
+        pkg.set_length(len);
+        uint32 offset = len;
+
+        // monitorType
+        TypesToBytes.uint32ToBytes(offset, monitorMessage.monitorType, pkg);
+        offset -= 4u32;
+
+        // monitorMsg
+        TypesToBytes.bytesToNewBytes(offset, monitorMessage.monitorMsg, pkg);
+        offset -= monitorMsgLen;
+
+        // message
+        TypesToBytes.bytesToNewBytes(offset, monitorMessage.message, pkg);
+        offset -= messageLen;
+
+        return pkg;
+    }
+
+    function MonitorMessage decodeMonitorMsg(array<uint8> pkg) public const {
+        uint32 offset = pkg.length();
+        MonitorMessage monitorMessage;
+        __debug.print("offset: ", offset);
+
+        // monitorType
+        monitorMessage.monitorType = BytesToTypes.bytesToUint32(offset, pkg);
+        offset -= 4u32;
+        __debug.print("monitorMessage.monitorType: ", monitorMessage.monitorType);
+        __debug.print("offset: ", offset);
+
+        // monitorMsg
+        BytesToTypes.bytesToSubBytes(offset, pkg, monitorMessage.monitorMsg);
+        offset -= SizeOf.sizeOfBytes(monitorMessage.monitorMsg);
+        __debug.print("monitorMessage.monitorMsg: ", monitorMessage.monitorMsg);
+        __debug.print("offset: ", offset);
+
+        // message
+        BytesToTypes.bytesToSubBytes(offset, pkg, monitorMessage.message);
+        offset -= SizeOf.sizeOfBytes(monitorMessage.message);
+        __debug.print("monitorMessage.message: ", monitorMessage.message);
+        __debug.print("offset: ", offset);
+
+        return monitorMessage;
+    }
+
+}

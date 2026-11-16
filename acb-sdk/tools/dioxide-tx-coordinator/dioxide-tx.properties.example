@@ -1,0 +1,12 @@
+# One networkId/checkpoint shared by all clients of the same physical chain.
+# Keep the real file at /etc/antchain-bridge/dioxide-tx.properties with mode 0600.
+networkId=dioxide-production
+checkpointHeight=4120000
+checkpointHash=REPLACE_WITH_VERIFIED_FINALIZED_BLOCK_HASH
+jdbcUrl=jdbc:mysql://127.0.0.1:3306/relayer_v2?connectTimeout=5000&socketTimeout=30000&useSSL=false
+user=crosschain_tx
+passwordFile=/etc/antchain-bridge/dioxide-tx.password
+# How long to observe dx.isn after tx.send returned a hash. A timeout does not
+# release the reservation; the next request reconciles against dx.isn again.
+acceptanceWaitMillis=20000
+acceptancePollMillis=500

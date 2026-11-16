@@ -100,6 +100,12 @@ message CallBBCRequest {
     QueryValidatedBlockStateRequest queryValidatedBlockStateRequest = 28;
     RecvOffChainExceptionRequest recvOffChainExceptionRequest = 29;
     ReliableRetryRequest reliableRetryRequest = 30;
+    SetupMonitorMessageContractRequest setupMonitorMessageContractReq=31;
+    SetMonitorContractRequest setMonitorContractReq = 32;
+    SetProtocolInMonitorRequest setProtocolInMonitorReq = 33;
+    SetMonitorControlRequest setMonitorControlReq = 34;
+    SetPtcHubInMonitorVerifierRequest setPtcHubInMonitorVerifierReq = 35;
+    RelayMonitorOrderRequest relayMonitorOrderReq =36;
   }
 }
 
@@ -123,6 +129,26 @@ message SetupSDPMessageContractRequest {
   // stay empty body for now, maybe fill some stuff in future
 }
 
+message SetupMonitorMessageContractRequest {
+  // stay empty body for now, maybe fill some stuff in future
+}
+
+message SetMonitorContractRequest {
+  string contractAddress = 1;
+}
+
+message SetProtocolInMonitorRequest {
+  string protocolAddress = 1;
+}
+
+message SetMonitorControlRequest {
+  uint32 monitorType = 1;
+}
+
+message SetPtcHubInMonitorVerifierRequest {
+  string contractAddress = 1;
+}
+
 message SetProtocolRequest {
   string protocolAddress = 1;
   string protocolType = 2;
@@ -134,6 +160,7 @@ message SetPtcContractRequest {
 
 message RelayAuthMessageRequest {
   bytes rawMessage = 1;
+  string submissionId = 2;
 }
 
 message SetAmContractRequest {
@@ -223,6 +250,13 @@ message ReliableRetryRequest {
   bytes reliableCrossChainMessageData = 1;
 }
 
+message RelayMonitorOrderRequest {
+  string committeeId = 1;
+  string signAlgo = 2;
+  bytes rawProof = 3;
+  bytes rawMonitorOrder = 4;
+}
+
 // basic messages.
 // same as project `antchain-bridge-commons`
 message CrossChainMessageReceipt {
@@ -277,6 +311,8 @@ message CallBBCResponse {
     QueryValidatedBlockStateResponse queryValidatedBlockStateResponse = 18;
     RecvOffChainExceptionResponse recvOffChainExceptionResponse = 19;
     ReliableRetryResponse reliableRetryResponse = 20;
+    SetupMonitorMessageContractResponse setupMonitorResp = 21;
+    RelayMonitorOrderResponse relayMonitorOrderResp = 22;
   }
 }
 
@@ -307,6 +343,16 @@ message SDPMessageContract {
 
 message SetupSDPMessageContractResponse {
   SDPMessageContract sdpContract = 1;
+}
+
+message MonitorMessageContract {
+  string contractAddress = 1;
+  ContractStatusEnum status = 2;
+}
+
+
+message SetupMonitorMessageContractResponse {
+  MonitorMessageContract monitorContract = 1;
 }
 
 message PtcContract {
@@ -379,5 +425,9 @@ message RecvOffChainExceptionResponse {
 }
 
 message ReliableRetryResponse {
+  CrossChainMessageReceipt receipt = 1;
+}
+
+message RelayMonitorOrderResponse {
   CrossChainMessageReceipt receipt = 1;
 }

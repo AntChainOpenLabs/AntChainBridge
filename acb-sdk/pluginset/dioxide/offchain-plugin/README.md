@@ -57,3 +57,26 @@ dioxide链的配置文件`dioxide.json`主要包括节点网络连接信息和�
 
 # 注意事项
 - 目前仅支持SDPv1消息版本和跨链消息传输的基本功能，基于PTC的跨链消息验证功能有待开发。
+
+## Coordinated submission and upgrade requirements
+
+The updated writer requires a shared coordinator schema v2, an explicit network
+checkpoint, and a stable submission ID supplied by the updated Relayer and
+PluginServer. Upgrade these components together; the legacy one-argument entry
+point is retained, but a new Dioxide writer rejects a missing identity rather
+than guessing one from the payload or allocating an unsafe replacement.
+
+Install the schema explicitly using the SQL in `antchain-bridge-plugin-lib` and
+use the Python tools under `acb-sdk/tools/dioxide-tx-coordinator` for other writing
+processes. No automatic migration or counter reset runs at startup. Preserve
+unknown signed submissions and query their original operation or transaction.
+
+For existing Relayer schemas, inspect the UCP pool's native-hash capacity before
+adopting Dioxide. The optional `20261113_dioxide_native_hash_columns.sql` widens
+only UCP pool block/transaction columns; it does not alter validated-consensus
+hash columns or committee tables. Apply it explicitly after the usual backup
+and schema review if those UCP columns are still limited to 66 characters.
+
+Plain Dioxide remains a V0 trusted-relayer receiving AM. Native consensus reading
+does not grant PTC capability. Missing HCDVS cannot be treated as successful
+committee validation or endorsement.

@@ -19,7 +19,10 @@ package com.alipay.antchain.bridge.relayer.bootstrap.repo;
 import java.util.List;
 import javax.annotation.Resource;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.ListUtil;
+import cn.hutool.core.util.RandomUtil;
+import com.alipay.antchain.bridge.commons.core.ptc.ValidatedConsensusStateV1;
 import com.alipay.antchain.bridge.relayer.bootstrap.TestBase;
 import com.alipay.antchain.bridge.relayer.commons.constant.BlockchainStateEnum;
 import com.alipay.antchain.bridge.relayer.commons.exception.AntChainBridgeRelayerException;
@@ -341,12 +344,16 @@ public class BlockchainRepositoryTest extends TestBase {
 
     @Test
     public void testValidatedConsensusState() {
+        ValidatedConsensusStateV1 dioxideLengthVcs = BeanUtil.copyProperties(anchorVcs, ValidatedConsensusStateV1.class);
+        dioxideLengthVcs.setHash(RandomUtil.randomBytes(52));
+        dioxideLengthVcs.setParentHash(RandomUtil.randomBytes(52));
+
         ValidatedConsensusStateDO vcsDO = ValidatedConsensusStateDO.builder()
                 .blockchainProduct(testchain1Meta.getProduct())
                 .blockchainId(testchain1Meta.getBlockchainId())
                 .ptcServiceId(PTC_SERVICE_ID1)
                 .tpbtaLane(tpbtaLaneChannelLevel)
-                .validatedConsensusState(anchorVcs)
+                .validatedConsensusState(dioxideLengthVcs)
                 .build();
         blockchainRepository.setValidatedConsensusState(vcsDO);
 
@@ -355,7 +362,7 @@ public class BlockchainRepositoryTest extends TestBase {
                         PTC_SERVICE_ID1,
                         antchainBta.getDomain().getDomain(),
                         tpbtaLaneChannelLevel,
-                        anchorVcs.getHeight()
+                        dioxideLengthVcs.getHeight()
                 )
         );
         Assert.assertTrue(
@@ -363,16 +370,16 @@ public class BlockchainRepositoryTest extends TestBase {
                         PTC_SERVICE_ID1,
                         antchainBta.getDomain().getDomain(),
                         tpbtaLaneChannelLevel,
-                        anchorVcs.getHashHex()
+                        dioxideLengthVcs.getHashHex()
                 )
         );
         Assert.assertArrayEquals(
-                anchorVcs.encode(),
+                dioxideLengthVcs.encode(),
                 blockchainRepository.getValidatedConsensusState(
                         PTC_SERVICE_ID1,
                         antchainBta.getDomain().getDomain(),
                         tpbtaLaneChannelLevel,
-                        anchorVcs.getHeight()
+                        dioxideLengthVcs.getHeight()
                 ).getValidatedConsensusState().encode()
         );
     }

@@ -156,10 +156,28 @@ public class GrpcNodeClient implements INodeClient {
 
     @Override
     public CommitteeNodeProof verifyCrossChainMessage(CrossChainLane crossChainLane, UniformCrosschainPacket packet) {
+        return verifyCrossChainMessageWithResult(crossChainLane, packet).getNodeProof();
+    }
+
+    @Override
+    public NodeVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            CrossChainLane crossChainLane,
+            UniformCrosschainPacket packet
+    ) {
+        return verifyCrossChainMessageWithResult(crossChainLane, packet, "");
+    }
+
+    @Override
+    public NodeVerifyCrossChainMessageResult verifyCrossChainMessageWithResult(
+            CrossChainLane crossChainLane,
+            UniformCrosschainPacket packet,
+            String ucpId
+    ) {
         Response response = stub.verifyCrossChainMessage(
                 VerifyCrossChainMessageRequest.newBuilder()
                         .setRawUcp(ByteString.copyFrom(packet.encode()))
                         .setCrossChainLane(ByteString.copyFrom(crossChainLane.encode()))
+                        .setUcpId(StrUtil.nullToEmpty(ucpId))
                         .build()
         );
         if (ObjectUtil.isNull(response)) {
@@ -168,7 +186,12 @@ public class GrpcNodeClient implements INodeClient {
         if (response.getCode() != 0) {
             throw new RuntimeException(StrUtil.format("response shows request failed: ( code: {}, msg: {})", response.getCode(), response.getErrorMsg()));
         }
-        return CommitteeNodeProof.decode(response.getVerifyCrossChainMessageResp().getRawNodeProof().toByteArray());
+        VerifyCrossChainMessageResponse verifyResponse = response.getVerifyCrossChainMessageResp();
+        return new NodeVerifyCrossChainMessageResult(
+                CommitteeNodeProof.decode(verifyResponse.getRawNodeProof().toByteArray()),
+                verifyResponse.getRegulationStatus(),
+                verifyResponse.getRegulationReason()
+        );
     }
 
     @Override

@@ -413,9 +413,11 @@ public class DioxideBBCServiceTest {
 
         // relay am msg
         CrossChainMessageReceipt receipt = dioxideBBCService.relayAuthMessage(getRawMsgFromRelayer());
+        Assert.assertFalse(receipt.isConfirmed());
         Assert.assertTrue(receipt.isSuccessful());
+        Assert.assertTrue(StrUtil.isNotEmpty(receipt.getTxhash()));
 
-        // wait for tx success (ReadCrossChainMessageReceipt)
+        // wait for the entire relay chain to be finalized
         while (true) {
             try {
                 Thread.sleep(2000);

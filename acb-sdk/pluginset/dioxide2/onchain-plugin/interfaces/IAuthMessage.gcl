@@ -1,0 +1,48 @@
+contract IAuthMessage {
+
+/**
+ * @dev {IAuthMessage} is the basic protocol of the cross-chain communication protocol stack,
+ * and AM is a verifiable cross-chain message which makes the upper layer protocol not need
+ * to care about the legitimacy of the cross-chain message.
+ *
+ * When the {IAuthMessage} contract receives the cross-chain message submitted by the relayer,
+ * it will decode cross-chain message. Then, the IAuthMessage contract will parse the cross-chain
+ * message and forward it to the specified upper layer protocol contract.
+ */
+
+    interface AuthMessageInterface {
+
+        /**
+        * @dev Set the SDP contract address for verifying the proof come from outside the blockchain.
+        * @param protocolAddress upper protocol contract address
+        * @param protocolType type number for upper protocol. for example sdp protocol is zero.
+        */
+        @address function setProtocol(uint64 protocolID, address protocolAddress, uint32 protocolType) public export;
+
+        @address function setPtcHub(uint64 _ptcHubId, address _ptcHubAddress) public export;
+
+        /**
+        * @dev The upper protocol call this method to send cross-chain message.
+        *
+        * The upper layer protocol passes the message constructed by itself to the AM contract.
+        * The AM contract will generate event SendAuthMessage containing serialized AuthMessage.
+        *
+        * @param senderID who send the cross-chain message to upper protocol.
+        * @param message message from upper protocol.
+        */
+        @global function recvFromProtocol(uint64 senderID, array<uint8> message) public;
+
+        /**
+        * @dev The relayer call this method to submit raw cross-chain message.
+        *
+        * The relayer submits the cross-chain messages in the network to the AM contract.
+        * The AM contract decodes the message.
+        * Then, the upper-layer protocol message is parsed and the
+        * message is passed to the upper-layer protocol through inter-contract calls.
+        *
+        * @param pkg raw cross-chain message submitted by relayer.
+        */
+        @address function recvPkgFromRelayer(array<uint8> pkg) public;
+
+    }
+}

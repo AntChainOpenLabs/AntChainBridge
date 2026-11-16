@@ -1,0 +1,105 @@
+import Utils;
+import BytesToTypes;
+
+contract TLVUtils {
+
+    struct TLVItem {
+        uint16 tagType;
+        uint32 len;
+        array<uint8> value;
+    }
+
+    struct LVItem {
+        uint32 len;
+        array<uint8> value;
+    }
+
+    struct TLVWithOffset {
+        uint32 offset;
+        TLVItem tlvItem;
+    }
+
+    struct LVWithOffset {
+        uint32 offset;
+        LVItem lvItem;
+    }
+
+    /**
+     * @notice 解析 TLV (Type-Length-Value) 格式的数据项
+     * @param rawData 原始数据
+     * @param offset 开始位置
+     * @return TLVWithOffset 包含解析结果和新的偏移量
+     */
+    function TLVWithOffset parseTLVItem(array<uint8> rawData, uint32 offset) public const {
+        TLVWithOffset result;
+
+        // 确保有足够的数据读取 tag 和 length (至少 6 字节)
+        __debug.assert(offset + 6u32 <= rawData.length());
+
+        // 读取 tagType (2 bytes, big-endian, then reverse to little-endian)
+        // Read as big-endian: [offset] is high byte, [offset+1] is low byte
+        uint16 tagBE = (uint16(rawData[offset]) << 8u16) | uint16(rawData[offset + 1u32]);
+        result.tlvItem.tagType = ((tagBE & 0xFF00u16) >> 8u16) | ((tagBE & 0x00FFu16) << 8u16);  // reverse bytes
+        offset += 2u32;
+
+        // 读取 length (4 bytes, big-endian, then reverse to little-endian)
+        uint32 lenBE = (uint32(rawData[offset]) << 24u32) 
+                     | (uint32(rawData[offset + 1u32]) << 16u32)
+                     | (uint32(rawData[offset + 2u32]) << 8u32)
+                     | uint32(rawData[offset + 3u32]);
+        // Reverse bytes: 0x12345678 -> 0x78563412
+        result.tlvItem.len = ((lenBE & 0xFF000000u32) >> 24u32)
+                           | ((lenBE & 0x00FF0000u32) >> 8u32)
+                           | ((lenBE & 0x0000FF00u32) << 8u32)
+                           | ((lenBE & 0x000000FFu32) << 24u32);
+        offset += 4u32;
+
+        // 确保有足够的数据读取 value
+        __debug.assert(offset + result.tlvItem.len <= rawData.length());
+
+        // 读取 value (直接从当前 offset 复制 len 个字节)
+        for (uint32 i = 0u32; i < result.tlvItem.len; i++) {
+            result.tlvItem.value.push(rawData[offset + i]);
+        }
+        offset += result.tlvItem.len;
+
+        result.offset = offset;
+        return result;
+    }
+
+    /**
+     * @notice 解析 LV (Length-Value) 格式的数据项
+     * @param rawData 原始数据
+     * @param offset 开始位置
+     * @return LVWithOffset 包含解析结果和新的偏移量
+     */
+    function LVWithOffset parseLVItem(array<uint8> rawData, uint32 offset) public const {
+        LVWithOffset result;
+
+        __debug.assert(offset + 4u32 <= rawData.length());
+
+        // 读取 length (4 bytes, big-endian, then reverse to little-endian)
+        uint32 lenBE = (uint32(rawData[offset]) << 24u32) 
+                     | (uint32(rawData[offset + 1u32]) << 16u32)
+                     | (uint32(rawData[offset + 2u32]) << 8u32)
+                     | uint32(rawData[offset + 3u32]);
+        result.lvItem.len = ((lenBE & 0xFF000000u32) >> 24u32)
+                          | ((lenBE & 0x00FF0000u32) >> 8u32)
+                          | ((lenBE & 0x0000FF00u32) << 8u32)
+                          | ((lenBE & 0x000000FFu32) << 24u32);
+        offset += 4u32;
+
+        __debug.assert(offset + result.lvItem.len <= rawData.length());
+
+        // 读取 value (直接从当前 offset 复制 len 个字节)
+        for (uint32 i = 0u32; i < result.lvItem.len; i++) {
+            result.lvItem.value.push(rawData[offset + i]);
+        }
+        offset += result.lvItem.len;
+
+        result.offset = offset;
+
+        return result;
+    }
+
+}

@@ -17,6 +17,8 @@
         <module>supervisor</module>
         <module>node</module>
         <module>node-cli</module>
+        <module>monitor-node</module>
+        <module>monitor-node-cli</module>
     </modules>
     <packaging>pom</packaging>
 

@@ -222,7 +222,9 @@ AntChain Bridge支持Hyperledger Fabric的BBC接入，参考[代码](pluginset/f
 > [!NOTE]  
 > 目前仅支持BBC部分，即V0
 
-AntChain Bridge支持FISCO BCOS的BBC接入，参考[代码](pluginset/fiscobcos)。
+AntChain Bridge 支持 FISCO BCOS 3.x 的两套 BBC：无监管基线见
+[fiscobcos](pluginset/fiscobcos)，完整监管版见 [fiscobcos3](pluginset/fiscobcos3)。
+旧 FISCO BCOS 2.x 插件继续使用 [fiscobcos2](pluginset/fiscobcos2)。
 
 ### Hyperchain2.0
 

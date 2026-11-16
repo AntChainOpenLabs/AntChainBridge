@@ -31,6 +31,7 @@ import com.alipay.antchain.bridge.plugins.dioxide.conf.DioxideConfig;
 import com.alipay.antchain.bridge.plugins.dioxide.conf.DioxideTypes;
 import com.alipay.antchain.bridge.plugins.dioxide.core.DioxideClient;
 import com.alipay.antchain.bridge.plugins.dioxide.core.DioxideTransaction;
+import com.alipay.antchain.bridge.plugins.dioxide.core.DioxideTransactionBlock;
 import com.alipay.antchain.bridge.plugins.lib.BBCService;
 import com.alipay.antchain.bridge.plugins.spi.bbc.AbstractBBCService;
 import lombok.Getter;
@@ -50,8 +51,7 @@ public class DioxideBBCService extends AbstractBBCService {
 
     @Override
     public void startup(AbstractBBCContext abstractBBCContext) {
-        getBBCLogger().info("Dioxide BBCService startup with context: {}",
-                new String(abstractBBCContext.getConfForBlockchainClient()));
+        getBBCLogger().info("Dioxide BBCService startup");
 
         if (ObjectUtil.isNull(abstractBBCContext)) {
             throw new RuntimeException("null bbc context");
@@ -119,12 +119,18 @@ public class DioxideBBCService extends AbstractBBCService {
                 this.bbcContext.getSdpContract() != null ? this.bbcContext.getSdpContract().getStatus() : ""
         );
 
+        // Persist discovered CIDs with the context; reopening must not use stale configuration.
+        if (bbcContext.getAuthMessageContract() != null) {
+            config.setAmContractAddressDeployed(bbcContext.getAuthMessageContract().getContractAddress());
+        }
+        if (bbcContext.getSdpContract() != null) {
+            config.setSdpContractAddressDeployed(bbcContext.getSdpContract().getContractAddress());
+        }
         this.bbcContext.setConfForBlockchainClient(this.config.toJsonString().getBytes(StandardCharsets.UTF_8));
         return this.bbcContext;
     }
 
-    // NOTICE: for the databases in relayer can only store 32 bytes tx hash, interface [relayAuthMessage] will adopt send ucp in a synchronous way.
-    // In this case, interface [readCrossChainMessageReceipt] will not be used.
+    // Relayer polls this interface after relayAuthMessage returns an unconfirmed receipt.
     @Override
     public CrossChainMessageReceipt readCrossChainMessageReceipt(String txHash) {
         DioxideTransaction dioxideTransaction = dioxideClient.getTransactionByHash(txHash);
@@ -172,16 +178,14 @@ public class DioxideBBCService extends AbstractBBCService {
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
-        if (ObjectUtil.isNotNull(this.bbcContext.getAuthMessageContract())
-                && StrUtil.isNotEmpty(this.bbcContext.getAuthMessageContract().getContractAddress())) {
+        if (checkAmContractIsDeployed()) {
             // If the contract has been pre-deployed and the contract address is configured in the configuration file,
             // there is no need to redeploy.
             return;
         }
 
         // 2. deploy contract
-        if (ObjectUtil.isNotNull(this.bbcContext.getSdpContract())
-                && StrUtil.isNotEmpty(this.bbcContext.getSdpContract().getContractAddress())) {
+        if (checkSdpContractIsDeployed()) {
             dioxideClient.getConfig().setIsPreContractDeployed(true);
         }
         long amContractCid = dioxideClient.deployAuthMsgContract();
@@ -200,16 +204,14 @@ public class DioxideBBCService extends AbstractBBCService {
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
         }
-        if (ObjectUtil.isNotNull(this.bbcContext.getSdpContract())
-                && StrUtil.isNotEmpty(this.bbcContext.getSdpContract().getContractAddress())) {
+        if (checkSdpContractIsDeployed()) {
             // If the contract has been pre-deployed and the contract address is configured in the configuration file,
             // there is no need to redeploy.
             return;
         }
 
         // 2. deploy contract
-        if (ObjectUtil.isNotNull(this.bbcContext.getAuthMessageContract())
-                && StrUtil.isNotEmpty(this.bbcContext.getAuthMessageContract().getContractAddress())) {
+        if (checkAmContractIsDeployed()) {
             dioxideClient.getConfig().setIsPreContractDeployed(true);
         }
         long sdpContractCid = dioxideClient.deploySdpContract();
@@ -282,8 +284,7 @@ public class DioxideBBCService extends AbstractBBCService {
         try {
             JSONObject valState = dioxideClient.getContractState(this.config.getDappName(), config.getSdpContractName(), DioxideTypes.Scope.Global, "")
                     .getJSONObject("State");
-            if (StrUtil.isNotEmpty(valState.getString("amAddress"))
-                    && StrUtil.isNotEmpty(valState.getString("amContractId"))
+            if (!"0".equals(valState.getString("amContractId"))
                     && CollUtil.isNotEmpty(valState.getJSONArray("localDomain"))) {
                 this.bbcContext.getSdpContract().setStatus(ContractStatusEnum.CONTRACT_READY);
             }
@@ -312,8 +313,8 @@ public class DioxideBBCService extends AbstractBBCService {
         try {
             JSONObject valState = dioxideClient.getContractState(this.config.getDappName(), config.getSdpContractName(), DioxideTypes.Scope.Global, "")
                     .getJSONObject("State");
-            if (StrUtil.isNotEmpty(valState.getString("amAddress"))
-                    && StrUtil.isNotEmpty(valState.getString("amContractId"))
+
+            if (!"0".equals(valState.getString("amContractId"))
                     && CollUtil.isNotEmpty(valState.getJSONArray("localDomain"))) {
                 this.bbcContext.getSdpContract().setStatus(ContractStatusEnum.CONTRACT_READY);
             }
@@ -327,8 +328,14 @@ public class DioxideBBCService extends AbstractBBCService {
 
     }
 
+
     @Override
     public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage) {
+        return relayAuthMessage(rawMessage, "");
+    }
+
+    @Override
+    public CrossChainMessageReceipt relayAuthMessage(byte[] rawMessage, String submissionId) {
         // 1. check context
         if (ObjectUtil.isNull(this.bbcContext)) {
             throw new RuntimeException("empty bbc context");
@@ -337,17 +344,43 @@ public class DioxideBBCService extends AbstractBBCService {
             throw new RuntimeException("empty am contract in bbc context");
         }
 
-        getBBCLogger().debug("relay AM {} to {} ",
-                HexUtil.encodeHexStr(rawMessage), this.config.getAmContractName());
-
-        return dioxideClient.relayMsgToAuthMsg(rawMessage);
+        return dioxideClient.relayMsgToAuthMsg(rawMessage, submissionId);
 
     }
 
     @Override
     public ConsensusState readConsensusState(BigInteger height) {
-        return null;
+        if (height == null || height.signum() < 0) {
+            throw new IllegalArgumentException("height must be non-negative");
+        }
+
+        DioxideTransactionBlock block = dioxideClient.getTransactionBlockInGlobalShardByHeight(height.longValueExact());
+        if (block == null) {
+            throw new RuntimeException("empty Dioxide transaction block at height " + height);
+        }
+        if (StrUtil.isEmpty(block.getHash())) {
+            throw new RuntimeException("empty Dioxide block hash at height " + height);
+        }
+
+        JSONObject consensusHeader = dioxideClient.getConsensusHeaderByHeight(height.longValueExact());
+        long timestamp = block.getTimestamp() == null
+                ? (consensusHeader == null ? 0L : consensusHeader.getLongValue("Timestamp"))
+                : block.getTimestamp();
+        byte[] stateData = consensusHeader == null
+                ? new byte[0]
+                : consensusHeader.toJSONString().getBytes(StandardCharsets.UTF_8);
+
+        return new ConsensusState(
+                BigInteger.valueOf(block.getHeight() == null ? height.longValueExact() : block.getHeight()),
+                block.getHash().getBytes(StandardCharsets.UTF_8),
+                StrUtil.nullToEmpty(block.getPrev()).getBytes(StandardCharsets.UTF_8),
+                timestamp,
+                stateData,
+                new byte[0],
+                new byte[0]
+        );
     }
+
 
     @Override
     public boolean hasTpBta(CrossChainLane tpbtaLane, int tpBtaVersion) {
@@ -386,17 +419,17 @@ public class DioxideBBCService extends AbstractBBCService {
 
     @Override
     public void setupPTCContract() {
-
+        throw new UnsupportedOperationException("Plain Dioxide uses the V0 trusted-relayer AM and has no PTC contract");
     }
 
     @Override
     public void setPtcContract(String ptcContractAddress) {
-
+        throw new UnsupportedOperationException("Plain Dioxide has no on-chain PTC contract");
     }
 
     @Override
     public void addTpBta(ThirdPartyBlockchainTrustAnchor tpbta) {
-
+        throw new UnsupportedOperationException("Plain Dioxide has no on-chain PTC contract");
     }
 
     @Override
@@ -412,6 +445,24 @@ public class DioxideBBCService extends AbstractBBCService {
     @Override
     public CrossChainMessageReceipt reliableRetry(ReliableCrossChainMessage msg) {
         throw new UnsupportedOperationException("not supported");
+    }
+
+    private boolean checkAmContractIsDeployed() {
+        return ObjectUtil.isNotNull(this.bbcContext.getAuthMessageContract())
+                && StrUtil.isNotEmpty(this.bbcContext.getAuthMessageContract().getContractAddress())
+                && dioxideClient.isContractVersionCurrent(
+                        config.getAmContractName(),
+                        this.bbcContext.getAuthMessageContract().getContractAddress()
+                );
+    }
+
+    private boolean checkSdpContractIsDeployed() {
+        return ObjectUtil.isNotNull(this.bbcContext.getSdpContract())
+                && StrUtil.isNotEmpty(this.bbcContext.getSdpContract().getContractAddress())
+                && dioxideClient.isContractVersionCurrent(
+                        config.getSdpContractName(),
+                        this.bbcContext.getSdpContract().getContractAddress()
+                );
     }
 
     private boolean isByteArrayZero(byte[] bytes) {

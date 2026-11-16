@@ -1031,7 +1031,7 @@ public class AcbEthClient {
 
             List<TransactionReceipt> finalAllReceiptsInBlock = allReceiptsInBlock;
             messageList.addAll(AuthMsg.getSendAuthMessageEvents(receipt).stream()
-                    .filter(x -> StrUtil.equals(x.log.getAddress(), amContractAddressHex))
+                    .filter(x -> StrUtil.equalsIgnoreCase(x.log.getAddress(), amContractAddressHex))
                     .map(
                             response -> CrossChainMessage.createCrossChainMessage(
                                     CrossChainMessage.CrossChainMessageType.AUTH_MSG,
@@ -1039,11 +1039,7 @@ public class AcbEthClient {
                                     block.getTimestamp().longValue() * 1000,
                                     beaconBlock.getRoot().toArray(),
                                     response.pkg,
-                                    EthAuthMessageLog.builder()
-                                            .logIndex(response.log.getLogIndex().intValue())
-                                            .sendAuthMessageLog(response.log)
-                                            .build()
-                                            .encodeToJson().getBytes(),
+                                    EthAuthMessageLog.fromReceipt(receipt, response.log).encodeToJson().getBytes(),
                                     getReceiptProof(finalAllReceiptsInBlock, response.log.getTransactionIndex().intValue()).encodeToJson().getBytes(),
                                     Numeric.hexStringToByteArray(receipt.getTransactionHash())
                             )
@@ -1082,8 +1078,8 @@ public class AcbEthClient {
                 getBbcLogger().warn("log from node has wrong contract address: {}, expected: {}", logObject.getAddress(), amContractAddressHex);
                 continue;
             }
-            if (logObject.getTopics().size() != 1 || !StrUtil.equalsIgnoreCase(logObject.getTopics().getFirst(), SEND_AUTH_MESSAGE_LOG_TOPIC)) {
-                getBbcLogger().warn("log from node has wrong topic: {}, expected: {}", logObject.getTopics().getFirst(), SEND_AUTH_MESSAGE_LOG_TOPIC);
+            if (logObject.getTopics() == null || logObject.getTopics().size() != 1 || !StrUtil.equalsIgnoreCase(logObject.getTopics().getFirst(), SEND_AUTH_MESSAGE_LOG_TOPIC)) {
+                getBbcLogger().warn("log from node has wrong topics: {}, expected: {}", logObject.getTopics(), SEND_AUTH_MESSAGE_LOG_TOPIC);
                 continue;
             }
 
@@ -1097,24 +1093,18 @@ public class AcbEthClient {
             var blockTimestamp = block.getTimestamp().longValue() * 1000;
             var receiptProof = getReceiptProof(allReceiptsInBlock, logObject.getTransactionIndex().intValue());
 
-            messageList.addAll(
-                    AuthMsg.getSendAuthMessageEvents(transactionReceipt).stream().map(
-                            response -> CrossChainMessage.createCrossChainMessage(
-                                    CrossChainMessage.CrossChainMessageType.AUTH_MSG,
-                                    beaconBlock.getSlot().bigIntegerValue(),
-                                    blockTimestamp,
-                                    beaconBlock.getRoot().toArray(),
-                                    response.pkg,
-                                    EthAuthMessageLog.builder()
-                                            .logIndex(logObject.getLogIndex().intValue())
-                                            .sendAuthMessageLog(logObject)
-                                            .build()
-                                            .encodeToJson().getBytes(),
-                                    receiptProof.encodeToJson().getBytes(),
-                                    Numeric.hexStringToByteArray(logObject.getTransactionHash())
-                            )
-                    ).toList()
-            );
+            // One filter result denotes ONE event, not every AM event in the same transaction.
+            var ledgerLog = EthAuthMessageLog.fromReceipt(transactionReceipt, logObject);
+            messageList.add(CrossChainMessage.createCrossChainMessage(
+                    CrossChainMessage.CrossChainMessageType.AUTH_MSG,
+                    beaconBlock.getSlot().bigIntegerValue(),
+                    blockTimestamp,
+                    beaconBlock.getRoot().toArray(),
+                    ledgerLog.decodeMessage(),
+                    ledgerLog.encodeToJson().getBytes(),
+                    receiptProof.encodeToJson().getBytes(),
+                    Numeric.hexStringToByteArray(transactionReceipt.getTransactionHash())
+            ));
         }
 
         if (!messageList.isEmpty()) {
